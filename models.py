@@ -15,6 +15,8 @@ class Leagues(db.Model):
     def __repr__(self):
         return f"<Leagues(name='{self.name}', url='{self.url}')>"
 
+    def json(self):
+        return {'id': self.id, 'name': self.name, 'url': self.url}
 class StreamSources(db.Model):
     __tablename__ = 'stream_sources'
     id = db.Column(db.Integer, primary_key=True)
@@ -27,6 +29,9 @@ class StreamSources(db.Model):
     def __init__(self, match_id, link):
         self.match_id = match_id
         self.link = link
+
+    def json(self):
+        return {'id': self.id, 'match_id': self.match_id, 'link': self.link}
 
 class Matches(db.Model):
     __tablename__ = 'matches'

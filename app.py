@@ -61,6 +61,14 @@ def get_matches():
         return make_response(jsonify({'message': 'Error getting matches', 'error': str(e)}), 500)
 
 
+@app.route('/stream_sources', methods=['GET'])
+def get_streamsources():
+    try:
+        stream_sources = StreamSources.query.all()
+        return make_response(jsonify([stream_source.json() for stream_source in stream_sources]), 200)
+    except Exception as e:
+        return make_response(jsonify({'message': 'Error getting leagues', 'error': str(e)}), 500)
+
 @app.route('/leagues', methods=['GET'])
 def get_leagues():
     try:
@@ -68,7 +76,7 @@ def get_leagues():
         return make_response(jsonify([league.json() for league in leagues]), 200)
     except Exception as e:
         return make_response(jsonify({'message': 'Error getting leagues', 'error': str(e)}), 500)
-    
+
 @app.route('/matches/<int:id>', methods=['GET'])
 def get_match(id):
     try:
