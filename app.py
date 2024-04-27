@@ -5,8 +5,11 @@ from os import environ
 from functools import wraps
 from models import Matches, Leagues, StreamSources  # Import the Match model from models.py
 from database import db
+import sys
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('DB_URL')
+print(environ.get('DB_URL'), file=sys.stderr)
 app.config['JWT_SECRET_KEY'] = 'xkYRtIG8FiHStcS5iS2aqsBeSFZcaj43cPDcX1Yph60GrQUbXC8YJP6MfOXV1DIv'
 db.init_app(app)
 jwt = JWTManager(app)
@@ -64,7 +67,7 @@ def get_leagues():
         leagues = Leagues.query.all()
         return make_response(jsonify([league.json() for league in leagues]), 200)
     except Exception as e:
-        return make_response(jsonify({'message': 'Error getting matches', 'error': str(e)}), 500)
+        return make_response(jsonify({'message': 'Error getting leagues', 'error': str(e)}), 500)
     
 @app.route('/matches/<int:id>', methods=['GET'])
 def get_match(id):

@@ -12,8 +12,6 @@ import sys
 from webdriver_manager.chrome import ChromeDriverManager
 
 chrome_driver_path = "/root/.wdm/drivers/chromedriver/linux64/114.0.5735.90/chromedriver"  # Update this with the correct path to your chromedriver
-print(chrome_driver_path, file=sys.stderr)
-
 
 def insert_default_leagues():
     default_leagues = [
@@ -31,14 +29,13 @@ def scheduleCrawler(driver, league):
     print("scheduleCrawler", file=sys.stderr)
     driver.get(league.url)
     wait = WebDriverWait(driver, 10)
-
+    
     try:
         contentDiv = wait.until(EC.presence_of_element_located((By.ID, 'content')))
         
         # Crawl day
         header = contentDiv.find_element(By.CSS_SELECTOR, ".header")
         dayH2 = header.find_element(By.TAG_NAME, 'h2').text
-        print(dayH2)
         # Crawl match
         fixtures = contentDiv.find_element(By.ID, "fixtures")
         fixturesUl = fixtures.find_element(By.CSS_SELECTOR, ".competitions")
@@ -52,7 +49,6 @@ def scheduleCrawler(driver, league):
             time_str = matchTime + " " + dayH2
             matchTimeConverted = convert_to_utc_psql_format(time_str)
             matchURL = li.find_element(By.TAG_NAME, "a").get_attribute("href")
-            print(team1Name, team2Name, time_str, matchURL, matchTimeConverted)
         
     except Exception as e:
         print(f"An error occurred during web scraping for {league.name}:", e, file=sys.stderr)

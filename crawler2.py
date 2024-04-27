@@ -31,7 +31,7 @@ def get_live_links(driver, match_url):
             links.append(tr.get_attribute('data-stream-link'))
 
     except Exception as e:
-        print("An error occurred:", e)
+        print("An error occurred:", e, file=sys.stderr)
 
     return links
 
@@ -40,7 +40,7 @@ def find_matches_about_to_start(db, time_buffer=100):
     start_time = now + timedelta(minutes=time_buffer)
     end_time = start_time + timedelta(minutes=100)
     
-    print(start_time, end_time)
+    print(start_time, end_time, file=sys.stderr)
 
     return db.session.query(Matches).filter(
         Matches.datetime >= start_time,
@@ -70,7 +70,7 @@ def main():
     
 def main_loop():
     while True:
-        print(f"Running stream source crawler at {datetime.now()}")
+        print(f"Running stream source crawler at {datetime.now()}", file=sys.stderr)
         main()
         time.sleep(10)  # Sleep for 10 seconds
 
