@@ -118,6 +118,7 @@ if __name__ == '__main__':
     from crawler2 import main_loop as crawler2_main_loop
     with app.app_context():
         db.create_all()
+        print('CRAWLERS WORKING NOW!', file=sys.stderr)
         crawler_main()
         crawler2_main_loop()
     app.run(debug=True)

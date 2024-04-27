@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 import time
 import chromedriver_autoinstaller
 from app import db, app
-
 from webdriver_manager.chrome import ChromeDriverManager
 import sys
 
@@ -67,7 +66,7 @@ def main():
 
         db.session.commit()
         db.session.close()
-    
+
 def main_loop():
     while True:
         print(f"Running stream source crawler at {datetime.now()}", file=sys.stderr)

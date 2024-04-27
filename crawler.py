@@ -10,6 +10,7 @@ from app import app, db
 import pytz
 import sys
 from webdriver_manager.chrome import ChromeDriverManager
+import chromedriver_autoinstaller
 
 chrome_driver_path = "/root/.wdm/drivers/chromedriver/linux64/114.0.5735.90/chromedriver"  # Update this with the correct path to your chromedriver
 
@@ -49,6 +50,7 @@ def scheduleCrawler(driver, league):
             time_str = matchTime + " " + dayH2
             matchTimeConverted = convert_to_utc_psql_format(time_str)
             matchURL = li.find_element(By.TAG_NAME, "a").get_attribute("href")
+            print(team1Name, team2Name, time_str, matchURL, matchTimeConverted, fike=sys.stderr)
         
     except Exception as e:
         print(f"An error occurred during web scraping for {league.name}:", e, file=sys.stderr)
@@ -82,7 +84,9 @@ def main():
         insert_default_leagues()
 
         # Find the path to the installed chromedriver
-        chrome_driver_path = ChromeDriverManager().install()
+        # chrome_driver_path = ChromeDriverManager().install()
+        chrome_driver_path = chromedriver_autoinstaller.install()
+
         print(chrome_driver_path, file=sys.stderr)
 
         try:
