@@ -1,3 +1,4 @@
+from flask_sqlalchemy import SQLAlchemy
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -7,12 +8,17 @@ from models import StreamSources, Matches
 from datetime import datetime, timedelta
 import time
 import chromedriver_autoinstaller
-from app import db, app
 from webdriver_manager.chrome import ChromeDriverManager
 import sys
+from apscheduler.schedulers.background import BackgroundScheduler
+from flask import Flask
+print("Selenium version:", webdriver.__version__)
+scheduler = BackgroundScheduler()
+# chrome_driver_path = "/root/.wdm/drivers/chromedriver/linux64/114.0.5735.90/chromedriver"  # Update this with the correct path to your chromedriver
+# print(chrome_driver_path, file=sys.stderr)
 
-chrome_driver_path = "/root/.wdm/drivers/chromedriver/linux64/114.0.5735.90/chromedriver"  # Update this with the correct path to your chromedriver
-print(chrome_driver_path, file=sys.stderr)
+db: SQLAlchemy = None
+app: Flask = None
 
 # Install and update chromedriver to match the installed Chrome version
 # chromedriver_autoinstaller.install()
@@ -21,7 +27,7 @@ def get_live_links(driver, match_url):
     links = []
     driver.get(match_url)
     try:
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, 'streams')))
+        WebDriverWait(driver).until(EC.presence_of_element_located((By.ID, 'streams')))
         streamTable = driver.find_element(By.CSS_SELECTOR, '.table.streams-table-new')
         tableBody = streamTable.find_element(By.TAG_NAME, 'tbody')
         tr_list = tableBody.find_elements(By.TAG_NAME, 'tr')
@@ -49,7 +55,8 @@ def find_matches_about_to_start(db, time_buffer=100):
 def main():
     with app.app_context():
         chrome_driver_path = chromedriver_autoinstaller.install()
-
+        # chrome_driver_path = ChromeDriverManager().install()
+        print(chrome_driver_path)
         upcoming_matches = find_matches_about_to_start(db)
 
         service = Service(executable_path=chrome_driver_path)
@@ -67,11 +74,13 @@ def main():
         db.session.commit()
         db.session.close()
 
-def main_loop():
-    while True:
-        print(f"Running stream source crawler at {datetime.now()}", file=sys.stderr)
-        main()
-        time.sleep(10)  # Sleep for 10 seconds
-
-if __name__ == "__main__":
-    main_loop()  # Call the main_loop() function
+def main_loop(appArg: Flask, dbArg: SQLAlchemy):
+    global db, app
+    app = appArg
+    db = dbArg
+    print("main loop")
+    print(f"Running stream source crawler at {datetime.now()}", file=sys.stderr)
+    print("RUNNING LOOP CRAWLER")
+    # scheduler.add_job(main, 'interval', seconds=10)
+    # scheduler.start()
+    main()

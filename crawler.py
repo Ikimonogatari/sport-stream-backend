@@ -1,3 +1,5 @@
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
 from models import Leagues
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -6,14 +8,14 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import pytz
 from datetime import datetime
-from app import app, db
-import pytz
 import sys
 from webdriver_manager.chrome import ChromeDriverManager
 import chromedriver_autoinstaller
 
-chrome_driver_path = "/root/.wdm/drivers/chromedriver/linux64/114.0.5735.90/chromedriver"  # Update this with the correct path to your chromedriver
+# chrome_driver_path = "/root/.wdm/drivers/chromedriver/linux64/114.0.5735.90/chromedriver"  # Update this with the correct path to your chromedriver
 
+db: SQLAlchemy = None
+app: Flask = None
 def insert_default_leagues():
     default_leagues = [
         {"name": "NBA", "url": "https://get.rnbastreams.com"},
@@ -79,7 +81,10 @@ def convert_to_utc_psql_format(date_str):
 
     return psql_compatible_string
 
-def main():
+def main(appArg: Flask, dbArg: SQLAlchemy):
+    global db, app
+    app = appArg
+    db = dbArg
     with app.app_context():
         insert_default_leagues()
 

@@ -10,7 +10,7 @@ idna
 outcome
 chromedriver_autoinstaller
 PySocks
-selenium
+selenium==4.0.0a7
 sniffio
 sortedcontainers
 trio
@@ -20,3 +20,4 @@ urllib3
 wsproto
 pytz
 webdriver_manager
+apscheduler

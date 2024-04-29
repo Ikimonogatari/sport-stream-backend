@@ -5,6 +5,8 @@ services:
     container_name: sportstream_app
     image: sportstreamapp:1.0.0
     build: .
+    volumes:
+      - ./:/app
     ports:
       - "4000:4000"
     environment:

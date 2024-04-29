@@ -3,16 +3,19 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
 from os import environ
 from functools import wraps
+import logging
 from models import Matches, Leagues, StreamSources  # Import the Match model from models.py
 from database import db
 import sys
 
 app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
 app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('DB_URL')
-print(environ.get('DB_URL'), file=sys.stderr)
 app.config['JWT_SECRET_KEY'] = 'xkYRtIG8FiHStcS5iS2aqsBeSFZcaj43cPDcX1Yph60GrQUbXC8YJP6MfOXV1DIv'
 db.init_app(app)
 jwt = JWTManager(app)
+
+logging.basicConfig(level=logging.DEBUG)
 
 # Authorization decorator to protect endpoints
 def authorization_required(fn):
@@ -113,12 +116,13 @@ def delete_match(id):
     except Exception as e:
         return make_response(jsonify({'message': 'Error deleting match', 'error': str(e)}), 500)
 
-if __name__ == '__main__':
-    from crawler import main as crawler_main
-    from crawler2 import main_loop as crawler2_main_loop
-    with app.app_context():
-        db.create_all()
-        print('CRAWLERS WORKING NOW!', file=sys.stderr)
-        crawler_main()
-        crawler2_main_loop()
+
+import crawler
+import crawler2
+app.logger.info("main")
+with app.app_context():
+    db.create_all()
+    print('CRAWLERS WORKING NOW!')
+    crawler.main(app, db)
+    crawler2.main_loop(app, db)
     app.run(debug=True)
