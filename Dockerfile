@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y google-chrome-stable
 RUN pip install -r requirements.txt
 
 # Install ChromeDriver and Selenium version 4
-# RUN pip install --no-cache-dir selenium==4.16.0
+RUN pip install --no-cache-dir selenium==4.16.0
 
 COPY . .
 

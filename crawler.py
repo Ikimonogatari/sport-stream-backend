@@ -4,6 +4,7 @@ from models import Leagues
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import pytz
@@ -93,10 +94,18 @@ def main(appArg: Flask, dbArg: SQLAlchemy):
         chrome_driver_path = chromedriver_autoinstaller.install()
 
         print(chrome_driver_path, file=sys.stderr)
+        chrome_options = Options()
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--proxy-bypass-list=*")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-browser-side-navigation")
 
         try:
             # Initialize the Chrome webdriver using the updated path
-            driver = webdriver.Chrome(chrome_driver_path)
+            service = Service(executable_path=chrome_driver_path)
+            driver = webdriver.Chrome(service=service, options=chrome_options)
             league = Leagues.query.filter_by(name="NBA").first()
             if league:
                 scheduleCrawler(driver, league)  # Pass the league object

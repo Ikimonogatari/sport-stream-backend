@@ -10,7 +10,7 @@ idna
 outcome
 chromedriver_autoinstaller
 PySocks
-selenium==4.0.0a7
+selenium==4.16.0
 sniffio
 sortedcontainers
 trio

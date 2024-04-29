@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from models import StreamSources, Matches
 from datetime import datetime, timedelta
 import time
@@ -14,6 +15,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
 print("Selenium version:", webdriver.__version__)
 scheduler = BackgroundScheduler()
+
 # chrome_driver_path = "/root/.wdm/drivers/chromedriver/linux64/114.0.5735.90/chromedriver"  # Update this with the correct path to your chromedriver
 # print(chrome_driver_path, file=sys.stderr)
 
@@ -27,7 +29,7 @@ def get_live_links(driver, match_url):
     links = []
     driver.get(match_url)
     try:
-        WebDriverWait(driver).until(EC.presence_of_element_located((By.ID, 'streams')))
+        WebDriverWait(driver,10).until(EC.presence_of_element_located((By.ID, 'streams')))
         streamTable = driver.find_element(By.CSS_SELECTOR, '.table.streams-table-new')
         tableBody = streamTable.find_element(By.TAG_NAME, 'tbody')
         tr_list = tableBody.find_elements(By.TAG_NAME, 'tr')
@@ -57,10 +59,18 @@ def main():
         chrome_driver_path = chromedriver_autoinstaller.install()
         # chrome_driver_path = ChromeDriverManager().install()
         print(chrome_driver_path)
+        chrome_options = Options()
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--proxy-bypass-list=*")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-browser-side-navigation")
+
         upcoming_matches = find_matches_about_to_start(db)
 
         service = Service(executable_path=chrome_driver_path)
-        with webdriver.Chrome(service=service) as driver:
+        with webdriver.Chrome(service=service, options=chrome_options) as driver:
             for match in upcoming_matches:
                 stream_links = get_live_links(driver, match.link)  # Ensure match has a 'url' attribute
                 for link in stream_links:
