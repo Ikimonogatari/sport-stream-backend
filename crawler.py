@@ -51,9 +51,11 @@ def scheduleCrawler(driver, league):
             matchTimeSpan = li.find_element(By.CSS_SELECTOR, '.competition-cell-score')
             matchTime = matchTimeSpan.find_element(By.TAG_NAME, "span").text
             time_str = matchTime + " " + dayH2
-            matchTimeConverted = convert_to_utc_psql_format(time_str)
+            # matchTimeConverted = convert_to_utc_psql_format(time_str)
+            matchTimeConverted = time_str
+
             matchURL = li.find_element(By.TAG_NAME, "a").get_attribute("href")
-            print(team1Name, team2Name, time_str, matchURL, matchTimeConverted, fike=sys.stderr)
+            print(team1Name, team2Name, time_str, matchURL, matchTimeConverted, file=sys.stderr)
         
     except Exception as e:
         print(f"An error occurred during web scraping for {league.name}:", e, file=sys.stderr)
