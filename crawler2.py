@@ -28,6 +28,7 @@ app: Flask = None
 def get_live_links(driver, match_url):
     links = []
     driver.get(match_url)
+    print('GETTING LIVE LINKS')
     try:
         WebDriverWait(driver,10).until(EC.presence_of_element_located((By.ID, 'streams')))
         streamTable = driver.find_element(By.CSS_SELECTOR, '.table.streams-table-new')
@@ -39,22 +40,25 @@ def get_live_links(driver, match_url):
 
     except Exception as e:
         print("An error occurred:", e, file=sys.stderr)
-
+    print('GOT LIVE LINKS', links)
     return links
-
+def get_all_matches(db):
+    return db.session.query(Matches).all()
 def find_matches_about_to_start(db, time_buffer=100):
     now = datetime.now()
     start_time = now + timedelta(minutes=time_buffer)
+    print('START TIME', start_time)
     end_time = start_time + timedelta(minutes=100)
-    
+    print('END TIME', end_time)
     print(start_time, end_time, file=sys.stderr)
-
+    print('ALL MATCHES IN DB', db.session.query(Matches).all())
     return db.session.query(Matches).filter(
         Matches.datetime >= start_time,
         Matches.datetime <= end_time
     ).all()
 
-def main():
+def main(db: SQLAlchemy, app: Flask):
+    print('PRINTING DB AND APP',db, app, file=sys.stderr)
     with app.app_context():
         chrome_driver_path = chromedriver_autoinstaller.install()
         # chrome_driver_path = ChromeDriverManager().install()
@@ -66,20 +70,33 @@ def main():
         chrome_options.add_argument("--proxy-bypass-list=*")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-browser-side-navigation")
-
-        upcoming_matches = find_matches_about_to_start(db)
+        print('MATCHES ABOUT TO START', db)
+        # upcoming_matches = find_matches_about_to_start(db)
+        upcoming_matches = get_all_matches(db)
 
         service = Service(executable_path=chrome_driver_path)
+        print('PRINTING DB AND APP USING SERVICE',db.session, file=sys.stderr)
         with webdriver.Chrome(service=service, options=chrome_options) as driver:
+            print('PRINTING SS SERVICE PROG', file=sys.stderr)
+            print('PRINTING SS SERVICE MATCH AND MATCHES', upcoming_matches, file=sys.stderr)
+
             for match in upcoming_matches:
+                print('PRINTING SS SERVICE LOOP1', file=sys.stderr)
+
                 stream_links = get_live_links(driver, match.link)  # Ensure match has a 'url' attribute
                 for link in stream_links:
+                    print('PRINTING SS SERVICE LOOP2', file=sys.stderr)
                     # Check if the stream source already exists
                     existing_source = db.session.query(StreamSources).filter_by(match_id=match.id, link=link).first()
                     if not existing_source:
                         # If no existing source, create a new one
                         stream_source = StreamSources(match_id=match.id, link=link)
                         db.session.add(stream_source)
+                        print('PRINTING STREAM SOURCE USING DB AND APP', stream_source, file=sys.stderr)
+                        print('PRINTING DB AND APP',db.session, file=sys.stderr)
+        print('PRINTING FINISHED STREAM SOURCE DB COMMIT', file=sys.stderr)
+
+
 
         db.session.commit()
         db.session.close()
@@ -93,4 +110,4 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     print("RUNNING LOOP CRAWLER")
     # scheduler.add_job(main, 'interval', seconds=10)
     # scheduler.start()
-    main()
+    main(db, app)

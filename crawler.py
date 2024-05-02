@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from models import Leagues
+from models import Leagues, Matches
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -47,20 +47,34 @@ def scheduleCrawler(driver, league):
         
         for li in fixturesLis:
             team1Name = li.find_element(By.CSS_SELECTOR, '.competition-cell-side1').text
-            team2Name = li.find_element(By.CSS_SELECTOR, '.competition-cell-side2').text
-            matchTimeSpan = li.find_element(By.CSS_SELECTOR, '.competition-cell-score')
-            matchTime = matchTimeSpan.find_element(By.TAG_NAME, "span").text
-            time_str = matchTime + " " + dayH2
-            # matchTimeConverted = convert_to_utc_psql_format(time_str)
-            matchTimeConverted = time_str
+            print("TEAM NAME1 IN CRAWLER1 LOOP", team1Name, file=sys.stderr)
 
+            team2Name = li.find_element(By.CSS_SELECTOR, '.competition-cell-side2').text
+            print("TEAM NAME2 IN CRAWLER1 LOOP", team2Name, file=sys.stderr)
+
+            matchTimeSpan = li.find_element(By.CSS_SELECTOR, '.competition-cell-score')
+            print('"match time span', matchTimeSpan)            
+            matchTime = matchTimeSpan.find_element(By.TAG_NAME, "span").text
+            print('match time', matchTime)
+            time_str = matchTime + " " + dayH2
+            print('time_str', time_str)
+            # matchTimeConverted = convert_to_utc_psql_format(time_str)
+            # print('Converted time', matchTimeConverted)
             matchURL = li.find_element(By.TAG_NAME, "a").get_attribute("href")
-            print(team1Name, team2Name, time_str, matchURL, matchTimeConverted, file=sys.stderr)
-        
+            print('CRAWLER1 MATCH INFO', team1Name, team2Name, time_str, matchURL, file=sys.stderr)
+
+            new_match = Matches(team1name=team1Name, team2name=team2Name, time=matchTime, link=matchURL, date=time_str,league_id = 1, datetime=datetime.now())
+            db.session.add(new_match)
+            print('NEW MATCH ADDED', db.session.add(new_match))
+            print('NEW MATCH', new_match)
+            
+        db.session.commit()
     except Exception as e:
         print(f"An error occurred during web scraping for {league.name}:", e, file=sys.stderr)
         db.session.rollback()
     finally:
+        print("scheduleCrawler final", file=sys.stderr)
+
         driver.quit()
         
 def convert_to_utc_psql_format(date_str):
@@ -68,10 +82,13 @@ def convert_to_utc_psql_format(date_str):
     date_format = "%H:%M %a %d %b %Y"
     
     # Parse the date string into a datetime object without the timezone
-    naive_datetime = datetime.strptime(date_str[:-8], date_format)
+    naive_datetime = datetime.strptime(date_str[:-4], date_format)
+    
+    tz_abbr = date_str[-3:]
 
     # Specify the timezone (EST in this case)
-    est = pytz.timezone('US/Eastern')
+    # est = pytz.timezone('US/Eastern')
+    est = pytz.timezone('EST' if tz_abbr == 'EST' else 'EDT')
 
     # Make the datetime object timezone aware
     aware_datetime = est.localize(naive_datetime)
@@ -88,6 +105,8 @@ def main(appArg: Flask, dbArg: SQLAlchemy):
     global db, app
     app = appArg
     db = dbArg
+    print('CRAWLER1 app and db', app, db)
+
     with app.app_context():
         insert_default_leagues()
 
@@ -111,6 +130,8 @@ def main(appArg: Flask, dbArg: SQLAlchemy):
             league = Leagues.query.filter_by(name="NBA").first()
             if league:
                 scheduleCrawler(driver, league)  # Pass the league object
+                print("scheduleCrawler", league, file=sys.stderr)
+
             else:
                 print("League not found in the database.", file=sys.stderr)
         except Exception as e:
