@@ -13,8 +13,6 @@ import sys
 from webdriver_manager.chrome import ChromeDriverManager
 import chromedriver_autoinstaller
 
-# chrome_driver_path = "/root/.wdm/drivers/chromedriver/linux64/114.0.5735.90/chromedriver"  # Update this with the correct path to your chromedriver
-
 db: SQLAlchemy = None
 app: Flask = None
 def insert_default_leagues():

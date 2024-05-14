@@ -16,14 +16,8 @@ from flask import Flask
 print("Selenium version:", webdriver.__version__)
 scheduler = BackgroundScheduler()
 
-# chrome_driver_path = "/root/.wdm/drivers/chromedriver/linux64/114.0.5735.90/chromedriver"  # Update this with the correct path to your chromedriver
-# print(chrome_driver_path, file=sys.stderr)
-
 db: SQLAlchemy = None
 app: Flask = None
-
-# Install and update chromedriver to match the installed Chrome version
-# chromedriver_autoinstaller.install()
 
 def get_live_links(driver, match_url):
     links = []
@@ -108,6 +102,6 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     print("main loop")
     print(f"Running stream source crawler at {datetime.now()}", file=sys.stderr)
     print("RUNNING LOOP CRAWLER")
-    # scheduler.add_job(main, 'interval', seconds=10)
-    # scheduler.start()
-    main(db, app)
+    scheduler.add_job(main(db, app), 'interval', seconds=10)
+    scheduler.start()
+    # main(db, app)
