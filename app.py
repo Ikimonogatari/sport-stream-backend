@@ -6,7 +6,6 @@ from functools import wraps
 import logging
 from models import Matches, Leagues, StreamSources  # Import the Match model from models.py
 from database import db
-import sys
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
