@@ -40,18 +40,27 @@ def get_all_matches(db):
     return db.session.query(Matches).all()
 def find_matches_about_to_start(db, time_buffer=100):
     now = datetime.now()
+    print(now, "TIMENOW")
     start_time = now + timedelta(minutes=time_buffer)
     print('START TIME', start_time)
     end_time = start_time + timedelta(minutes=100)
     print('END TIME', end_time)
     print(start_time, end_time, file=sys.stderr)
-    print('ALL MATCHES IN DB', db.session.query(Matches).all())
+    all_matches = db.session.query(Matches).all()
+
+    # Print the datetime of the first match, assuming it exists
+    if all_matches:
+        print('FIRST MATCH DATETIME:', all_matches[0].datetime)
+    else:
+        print('No matches found in the database.')
     return db.session.query(Matches).filter(
         Matches.datetime >= start_time,
         Matches.datetime <= end_time
     ).all()
 
 def main(db: SQLAlchemy, app: Flask):
+    now = datetime.now()
+
     print('PRINTING DB AND APP',db, app, file=sys.stderr)
     with app.app_context():
         chrome_driver_path = chromedriver_autoinstaller.install()
@@ -65,8 +74,8 @@ def main(db: SQLAlchemy, app: Flask):
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-browser-side-navigation")
         print('MATCHES ABOUT TO START', db)
-        # upcoming_matches = find_matches_about_to_start(db)
-        upcoming_matches = get_all_matches(db)
+        upcoming_matches = find_matches_about_to_start(db)
+        print("UPCOMING MATCHES",upcoming_matches, file=sys.stderr)
 
         service = Service(executable_path=chrome_driver_path)
         print('PRINTING DB AND APP USING SERVICE',db.session, file=sys.stderr)
@@ -102,6 +111,6 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     print("main loop")
     print(f"Running stream source crawler at {datetime.now()}", file=sys.stderr)
     print("RUNNING LOOP CRAWLER")
-    scheduler.add_job(main(db, app), 'interval', seconds=300)
-    scheduler.start()
-    # main(db, app)
+    # scheduler.add_job(main, 'interval', seconds=10, args=[db, app])
+    # scheduler.start()
+    main(db, app)
