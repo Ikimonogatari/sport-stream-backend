@@ -54,14 +54,16 @@ def scheduleCrawler(driver, league):
             print('"match time span', matchTimeSpan)            
             matchTime = matchTimeSpan.find_element(By.TAG_NAME, "span").text
             print('match time', matchTime)
-            time_str = matchTime + " " + dayH2
+            matchTime_no_tz = matchTime.replace(" EST", "")
+            print("match time no tz", matchTime_no_tz)
+            time_str = matchTime_no_tz + " " + dayH2
             print('time_str', time_str)
-            # matchTimeConverted = convert_to_utc_psql_format(time_str)
-            # print('Converted time', matchTimeConverted)
+            matchTimeConverted = convert_to_utc_psql_format(time_str)
+            print('Converted time', matchTimeConverted)
             matchURL = li.find_element(By.TAG_NAME, "a").get_attribute("href")
             print('CRAWLER1 MATCH INFO', team1Name, team2Name, time_str, matchURL, file=sys.stderr)
 
-            new_match = Matches(team1name=team1Name, team2name=team2Name, time=matchTime, link=matchURL, date=time_str,league_id = 1, datetime=datetime.now())
+            new_match = Matches(team1name=team1Name, team2name=team2Name, time=matchTime, link=matchURL, date=time_str,league_id = 1, datetime=matchTimeConverted)
             db.session.add(new_match)
             print('NEW MATCH ADDED', db.session.add(new_match))
             print('NEW MATCH', new_match)
@@ -80,13 +82,10 @@ def convert_to_utc_psql_format(date_str):
     date_format = "%H:%M %a %d %b %Y"
     
     # Parse the date string into a datetime object without the timezone
-    naive_datetime = datetime.strptime(date_str[:-4], date_format)
-    
-    tz_abbr = date_str[-3:]
+    naive_datetime = datetime.strptime(date_str, date_format)
 
     # Specify the timezone (EST in this case)
-    # est = pytz.timezone('US/Eastern')
-    est = pytz.timezone('EST' if tz_abbr == 'EST' else 'EDT')
+    est = pytz.timezone('US/Eastern')
 
     # Make the datetime object timezone aware
     aware_datetime = est.localize(naive_datetime)
