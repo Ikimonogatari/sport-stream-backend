@@ -11,10 +11,17 @@ import chromedriver_autoinstaller
 import sys
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
+import logging
+
+# Ensure the logger is configured
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 scheduler = BackgroundScheduler()
 
 db: SQLAlchemy = None
 app: Flask = None
+
 
 def get_live_links(driver, match_url):
     links = []
@@ -32,9 +39,6 @@ def get_live_links(driver, match_url):
         print("An error occurred:", e, file=sys.stderr)
     return links
 
-def get_all_matches(db):
-    return db.session.query(Matches).all()
-
 def find_matches_about_to_start(db, time_buffer=100):
     now = datetime.now()
     start_time = now + timedelta(minutes=time_buffer)
@@ -48,23 +52,34 @@ def find_matches_about_to_start(db, time_buffer=100):
     ).all()
 
 def remove_expired_stream_sources(db):
-    # Calculate the expiration time (e.g., remove stream sources older than 1 day)
-    expiration_time = datetime.now() - timedelta(days=1)
+    with app.app_context():
+        try:
+            # Calculate the expiration time for matches (e.g., matches older than 6 hours)
+            expiration_time = datetime.utcnow() - timedelta(hours=6)
 
-    # Query the database for stream sources older than the expiration time
-    expired_sources = db.session.query(StreamSources).filter(StreamSources.timestamp < expiration_time).all()
+            # Query the database for matches that have exceeded the expiration time
+            expired_matches = db.session.query(Matches).filter(Matches.datetime < expiration_time).all()
 
-    # Delete the expired stream sources
-    for source in expired_sources:
-        db.session.delete(source)
+            if expired_matches:
+                # Iterate over the expired matches
+                for match in expired_matches:
+                    # Query and delete the stream sources associated with the expired match
+                    db.session.query(StreamSources).filter(StreamSources.match_id == match.id).delete()
 
-    # Commit the changes to the database
-    db.session.commit()
+                # Commit the changes to the database
+                db.session.commit()
+                logger.info(f"Removed stream sources associated with {len(expired_matches)} expired matches.")
+            else:
+                logger.info("No expired matches found.")
+
+        except Exception as e:
+            # Rollback in case of any error
+            db.session.rollback()
+            logger.error(f"Error occurred while removing expired stream sources: {str(e)}")
 
 def main(db: SQLAlchemy, app: Flask):
     now = datetime.now()
 
-    print('PRINTING DB AND APP',db, app, file=sys.stderr)
     with app.app_context():
         chrome_driver_path = chromedriver_autoinstaller.install()
         chrome_options = Options()
@@ -88,7 +103,7 @@ def main(db: SQLAlchemy, app: Flask):
                     existing_source = db.session.query(StreamSources).filter_by(match_id=match.id, link=link).first()
                     if not existing_source:
                         # If no existing source, create a new one
-                        stream_source = StreamSources(match_id=match.id, link=link)
+                        stream_source = StreamSources(match_id=match.id, link=link, datetime=datetime.now())
                         db.session.add(stream_source)
                        
         db.session.commit()

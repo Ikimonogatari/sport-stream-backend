@@ -5,13 +5,12 @@ from functools import wraps
 import logging
 from models import Matches, Leagues, StreamSources  # Import the Match model from models.py
 from database import db
+from datetime import datetime
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('DB_URL')
-app.config['JWT_SECRET_KEY'] = 'xkYRtIG8FiHStcS5iS2aqsBeSFZcaj43cPDcX1Yph60GrQUbXC8YJP6MfOXV1DIv'
 db.init_app(app)
-jwt = JWTManager(app)
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -23,8 +22,17 @@ def authorization_required(fn):
             return make_response(jsonify({'message': 'Authorization header is missing'}), 401)
         
         try:
-            access_token = request.headers['Authorization'].split(' ')[1]
-            get_jwt_identity(access_token)
+            auth_header = request.headers['Authorization']
+            token_parts = auth_header.split()
+            if len(token_parts) != 2 or token_parts[0].lower() != 'bearer':
+                raise Exception("Invalid token")
+                
+            bearer_token = token_parts[1]
+            hardcoded_token = 'eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQWRtaW4iLCJJc3N1ZXIiOiJUdXZzaGluamFyZ2FsIiwiVXNlcm5hbWUiOiJJa2ltb25vIiwiZXhwIjoxNzE2MjEwMjA0LCJpYXQiOjE3MTYyMTAyMDR9.bPq8cTPObKakFg54JGia8-hpcBK0fwMQu8HLffELs1M'  # Replace with your hardcoded token
+            
+            if bearer_token != hardcoded_token:
+                raise Exception("Invalid token")
+                
         except Exception as e:
             return make_response(jsonify({'message': 'Invalid token'}), 401)
         
@@ -32,13 +40,9 @@ def authorization_required(fn):
     
     return wrapper
 
-# Test route
-@app.route('/test', methods=['GET'])
-def test():
-    return make_response(jsonify({'message': 'Test route'}), 200)
-
 # CRUD operations for matches
 @app.route('/matches', methods=['POST'])
+@authorization_required
 def create_match():
     try:
         data = request.get_json()
@@ -53,16 +57,19 @@ def create_match():
     except Exception as e:
         return make_response(jsonify({'message': 'Error creating match', 'error': str(e)}), 500)
 
+
 @app.route('/matches', methods=['GET'])
+@authorization_required
 def get_matches():
     try:
-        matches = Matches.query.all()
-        return make_response(jsonify([match.json() for match in matches]), 200)
+        now = datetime.now()
+        future_matches = Matches.query.filter(Matches.datetime > now).all()
+        return make_response(jsonify([match.json() for match in future_matches]), 200)
     except Exception as e:
         return make_response(jsonify({'message': 'Error getting matches', 'error': str(e)}), 500)
 
-
 @app.route('/stream_sources', methods=['GET'])
+@authorization_required
 def get_streamsources():
     try:
         stream_sources = StreamSources.query.all()
@@ -71,6 +78,7 @@ def get_streamsources():
         return make_response(jsonify({'message': 'Error getting leagues', 'error': str(e)}), 500)
 
 @app.route('/leagues', methods=['GET'])
+@authorization_required
 def get_leagues():
     try:
         leagues = Leagues.query.all()
@@ -79,6 +87,7 @@ def get_leagues():
         return make_response(jsonify({'message': 'Error getting leagues', 'error': str(e)}), 500)
 
 @app.route('/matches/<int:id>', methods=['GET'])
+@authorization_required
 def get_match(id):
     try:
         match = Matches.query.get(id)
@@ -89,6 +98,7 @@ def get_match(id):
         return make_response(jsonify({'message': 'Error getting match', 'error': str(e)}), 500)
 
 @app.route('/matches/<int:id>', methods=['PUT'])
+@authorization_required
 def update_match(id):
     try:
         match = Matches.query.get(id)
@@ -102,7 +112,9 @@ def update_match(id):
     except Exception as e:
         return make_response(jsonify({'message': 'Error updating match', 'error': str(e)}), 500)
 
+
 @app.route('/matches/<int:id>', methods=['DELETE'])
+@authorization_required
 def delete_match(id):
     try:
         match = Matches.query.get(id)
@@ -120,7 +132,6 @@ import crawler2
 app.logger.info("main")
 with app.app_context():
     db.create_all()
-    print('CRAWLERS WORKING NOW!')
     crawler.main(app, db)
     crawler2.main_loop(app, db)
     app.run(debug=True)

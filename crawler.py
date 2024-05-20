@@ -30,7 +30,6 @@ def insert_default_leagues():
     db.session.commit()
     
 def scheduleCrawler(driver, league):
-    print("scheduleCrawler", file=sys.stderr)
     driver.get(league.url)
     wait = WebDriverWait(driver, 10)
     
@@ -54,11 +53,13 @@ def scheduleCrawler(driver, league):
             time_str = matchTime_no_tz + " " + dayH2
             matchTimeConverted = convert_to_utc_psql_format(time_str)
             matchURL = li.find_element(By.TAG_NAME, "a").get_attribute("href")
-            print('CRAWLER1 MATCH INFO', team1Name, team2Name, time_str, matchURL, file=sys.stderr)
 
-            new_match = Matches(team1name=team1Name, team2name=team2Name, time=matchTime, link=matchURL, date=time_str,league_id = 1, datetime=matchTimeConverted)
-            db.session.add(new_match)
-            
+            existing_match = Matches.query.filter_by(team1name=team1Name, team2name=team2Name, time=matchTime, link=matchURL, date=time_str, league_id=1).first()
+            if not existing_match:
+                matchTimeConverted = convert_to_utc_psql_format(time_str)
+                new_match = Matches(team1name=team1Name, team2name=team2Name, time=matchTime, link=matchURL, date=time_str, league_id=1, datetime=matchTimeConverted)
+                db.session.add(new_match)
+              
         db.session.commit()
     except Exception as e:
         print(f"An error occurred during web scraping for {league.name}:", e, file=sys.stderr)
@@ -81,7 +82,6 @@ def main(appArg: Flask, dbArg: SQLAlchemy):
     global db, app
     app = appArg
     db = dbArg
-    print('CRAWLER1 app and db', app, db)
 
     with app.app_context():
         insert_default_leagues()
