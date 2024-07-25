@@ -10,16 +10,18 @@ from selenium.webdriver.support import expected_conditions as EC
 import pytz
 from datetime import datetime
 import sys
-
 import chromedriver_autoinstaller
 from apscheduler.schedulers.background import BackgroundScheduler
+
 scheduler = BackgroundScheduler()
 
 db: SQLAlchemy = None
 app: Flask = None
+
 def insert_default_leagues():
     default_leagues = [
-        {"name": "NBA", "url": "https://get.rnbastreams.com"},
+        {"name": "Basketball", "url": "https://get.rnbastreams.com"},
+        {"name": "Soccer", "url": "https://reddit15.sportshub.stream"},
     ]
 
     for league_info in default_leagues:
@@ -28,8 +30,24 @@ def insert_default_leagues():
             new_league = Leagues(name=league_info['name'], url=league_info['url'])
             db.session.add(new_league)
     db.session.commit()
-    
-def scheduleCrawler(driver, league):
+
+def setup_driver():
+    chrome_driver_path = chromedriver_autoinstaller.install()
+    chrome_options = Options()
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--proxy-bypass-list=*")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-browser-side-navigation")
+
+    service = Service(executable_path=chrome_driver_path)
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    return driver
+
+def scheduleNbaCrawler(driver, league):
+    print("BASKETBALL CRAWLER", file=sys.stderr)
+
     driver.get(league.url)
     wait = WebDriverWait(driver, 10)
     
@@ -54,10 +72,10 @@ def scheduleCrawler(driver, league):
             matchTimeConverted = convert_to_utc_psql_format(time_str)
             matchURL = li.find_element(By.TAG_NAME, "a").get_attribute("href")
 
-            existing_match = Matches.query.filter_by(team1name=team1Name, team2name=team2Name, time=matchTime, link=matchURL, date=time_str, league_id=1).first()
+            existing_match = Matches.query.filter_by(team1name=team1Name, team2name=team2Name, time=matchTime, link=matchURL, date=time_str, league_id=2).first()
             if not existing_match:
                 matchTimeConverted = convert_to_utc_psql_format(time_str)
-                new_match = Matches(team1name=team1Name, team2name=team2Name, time=matchTime, link=matchURL, date=time_str, league_id=1, datetime=matchTimeConverted)
+                new_match = Matches(team1name=team1Name, team2name=team2Name, time=matchTime, link=matchURL, date=time_str, league_id=2, datetime=matchTimeConverted)
                 db.session.add(new_match)
               
         db.session.commit()
@@ -66,9 +84,48 @@ def scheduleCrawler(driver, league):
         db.session.rollback()
     finally:
         driver.quit()
+
+def scheduleCrawler(driver, league):
+    print("SOCCER CRAWLER HERE", file=sys.stderr)
+
+    print(league.url, file=sys.stderr)
+    driver.get(league.url)
+    wait = WebDriverWait(driver, 10)
+    
+    try:
+        contentDiv = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'list-events')))
+        print("CONTENT DIV",contentDiv, file=sys.stderr)
+        
+        day = contentDiv.find_element(By.TAG_NAME, 'h4').text
+        # print("DAY",day, file=sys.stderr)
+
+        fixturesLis = contentDiv.find_elements(By.CLASS_NAME, 'wrap-events-item')
+        print("LIST DIV",fixturesLis, file=sys.stderr)
+        
+        for li in fixturesLis:
+            team1Name = li.find_element(By.CLASS_NAME, 'mr-5').text
+            print("Team names",team1Name, file=sys.stderr)
+
+            matchURL = li.find_element(By.TAG_NAME, "a").get_attribute("href")
+            print("MATCH URL",matchURL, file=sys.stderr)
+
+            existing_match = Matches.query.filter_by(team1name=team1Name, link=matchURL, date=day, league_id=3).first()
+            print("EXISTING MATCH",existing_match, file=sys.stderr)
+            if not existing_match:
+                new_match = Matches(team1name=team1Name, link=matchURL, date=day, league_id=3)
+                print("NEW MATCH TO ADD",new_match, file=sys.stderr)
+                db.session.add(new_match)
+                print("SINGLE SOCCER MATCH +", file=sys.stderr)
+
+        db.session.commit()
+        print("SOCCER MATCHES ADDED", file=sys.stderr)
+    except Exception as e:
+        print(f"An error occurred during web scraping for {league.name}:", e, file=sys.stderr)
+        db.session.rollback()
+    finally:
+        driver.quit()
         
 def convert_to_utc_psql_format(date_str):
-
     date_format = "%H:%M %a %d %b %Y"
     naive_datetime = datetime.strptime(date_str, date_format)
     est = pytz.timezone('US/Eastern')
@@ -86,26 +143,19 @@ def main(appArg: Flask, dbArg: SQLAlchemy):
     with app.app_context():
         insert_default_leagues()
 
-        chrome_driver_path = chromedriver_autoinstaller.install()
-        chrome_options = Options()
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--proxy-bypass-list=*")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-browser-side-navigation")
-
         try:
             # Initialize the Chrome webdriver using the updated path
-            service = Service(executable_path=chrome_driver_path)
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            league = Leagues.query.filter_by(name="NBA").first()
+            nbaleague = Leagues.query.filter_by(name="Basketball").first()
+            soccerleague = Leagues.query.filter_by(name="Soccer").first()
 
-            if league:
-                scheduleCrawler(driver, league)  # Pass the league object
-
-            else:
-                print("League not found in the database.", file=sys.stderr)
+            if nbaleague:
+                driver = setup_driver()
+                scheduleNbaCrawler(driver, nbaleague)  # Pass the league object
+                print("NBA MATCHES ADDED", file=sys.stderr)
+            if soccerleague:
+                driver = setup_driver()
+                scheduleCrawler(driver, soccerleague) 
+                print("SOCCER MATCHES ADDED", file=sys.stderr)
 
         except Exception as e:
             print("Failed to connect to database or run crawler:", e, file=sys.stderr)
@@ -116,4 +166,3 @@ def main(appArg: Flask, dbArg: SQLAlchemy):
 if __name__ == '__main__':
     scheduler.add_job(main, 'interval', hours=6, args=[db, app])
     scheduler.start()
-    
