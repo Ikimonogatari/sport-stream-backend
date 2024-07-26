@@ -86,6 +86,16 @@ def get_streamsources():
     except Exception as e:
         return make_response(jsonify({'message': 'Error getting leagues', 'error': str(e)}), 500)
 
+@app.route('/live-matches', methods=['GET'])
+# @authorization_required
+def get_live_matches():
+    try:
+        live_matches = Matches.query.filter_by(isLive=True).all()
+        return make_response(jsonify([match.json() for match in live_matches]), 200)
+    except Exception as e:
+        return make_response(jsonify({'message': 'Error getting live matches', 'error': str(e)}), 500)
+
+
 @app.route('/leagues', methods=['GET'])
 # @authorization_required
 def get_leagues():
