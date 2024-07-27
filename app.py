@@ -130,6 +130,19 @@ def get_matches_by_league():
         app.logger.error(f"Error getting matches: {str(e)}")
         return make_response(jsonify({'message': 'Error getting matches', 'error': str(e)}), 500)
 
+# New endpoint to get stream sources for a specific match
+@app.route('/matches/<int:match_id>/stream_sources', methods=['GET'])
+def get_stream_sources_for_match(match_id):
+    try:
+        match = Matches.query.get(match_id)
+        if not match:
+            return make_response(jsonify({'message': 'Match not found'}), 404)
+
+        stream_sources = StreamSources.query.filter_by(match_id=match_id).all()
+        return make_response(jsonify([stream_source.json() for stream_source in stream_sources]), 200)
+    except Exception as e:
+        app.logger.error(f"Error getting stream sources for match: {str(e)}")
+        return make_response(jsonify({'message': 'Error getting stream sources', 'error': str(e)}), 500)
 
 import crawler
 import crawler2
