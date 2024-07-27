@@ -161,9 +161,9 @@ def main(appArg: Flask, dbArg: SQLAlchemy):
         insert_default_leagues()
 
         try:
-            other_leagues = Leagues.query.filter(Leagues.name != "Basketball").all()
+            leagues = Leagues.query.all()
 
-            for league in other_leagues:
+            for league in leagues:
                 driver = setup_driver()
                 scheduleCrawler(driver, league)
                 logger.info(f"{league.name} matches added")
