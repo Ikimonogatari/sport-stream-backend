@@ -1,9 +1,7 @@
 from flask import Flask, request, jsonify, make_response
-from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
 from os import environ
-from functools import wraps
 import logging
-from models import Matches, Leagues, StreamSources  # Import the Match model from models.py
+from models import Matches, Leagues, StreamSources
 from database import db
 from datetime import datetime
 
@@ -14,35 +12,8 @@ db.init_app(app)
 
 logging.basicConfig(level=logging.DEBUG)
 
-# Authorization decorator to protect endpoints
-# def authorization_required(fn):
-#     @wraps(fn)
-#     def wrapper(*args, **kwargs):
-#         if 'Authorization' not in request.headers:
-#             return make_response(jsonify({'message': 'Authorization header is missing'}), 401)
-        
-#         try:
-#             auth_header = request.headers['Authorization']
-#             token_parts = auth_header.split()
-#             if len(token_parts) != 2 or token_parts[0].lower() != 'bearer':
-#                 raise Exception("Invalid token")
-                
-#             bearer_token = token_parts[1]
-#             hardcoded_token = 'eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQWRtaW4iLCJJc3N1ZXIiOiJUdXZzaGluamFyZ2FsIiwiVXNlcm5hbWUiOiJJa2ltb25vIiwiZXhwIjoxNzE2MjEwMjA0LCJpYXQiOjE3MTYyMTAyMDR9.bPq8cTPObKakFg54JGia8-hpcBK0fwMQu8HLffELs1M'  # Replace with your hardcoded token
-            
-#             if bearer_token != hardcoded_token:
-#                 raise Exception("Invalid token")
-                
-#         except Exception as e:
-#             return make_response(jsonify({'message': 'Invalid token'}), 401)
-        
-#         return fn(*args, **kwargs)
-    
-#     return wrapper
-
-# # CRUD operations for matches
+# CRUD operations for matches
 @app.route('/matches', methods=['POST'])
-# @authorization_required
 def create_match():
     try:
         data = request.get_json()
@@ -59,7 +30,6 @@ def create_match():
 
 
 @app.route('/matches', methods=['GET'])
-# @authorization_required
 def get_matches():
     try:
         now = datetime.now()
@@ -71,23 +41,20 @@ def get_matches():
 @app.route('/all-matches', methods=['GET'])
 def get_allmatches():
     try:
-        now = datetime.now()
         all_matches = Matches.query.all()
         return make_response(jsonify([match.json() for match in all_matches]), 200)
     except Exception as e:
         return make_response(jsonify({'message': 'Error getting matches', 'error': str(e)}), 500)
 
 @app.route('/stream_sources', methods=['GET'])
-# @authorization_required
 def get_streamsources():
     try:
         stream_sources = StreamSources.query.all()
         return make_response(jsonify([stream_source.json() for stream_source in stream_sources]), 200)
     except Exception as e:
-        return make_response(jsonify({'message': 'Error getting leagues', 'error': str(e)}), 500)
+        return make_response(jsonify({'message': 'Error getting stream sources', 'error': str(e)}), 500)
 
 @app.route('/live-matches', methods=['GET'])
-# @authorization_required
 def get_live_matches():
     try:
         live_matches = Matches.query.filter_by(isLive=True).all()
@@ -95,9 +62,7 @@ def get_live_matches():
     except Exception as e:
         return make_response(jsonify({'message': 'Error getting live matches', 'error': str(e)}), 500)
 
-
 @app.route('/leagues', methods=['GET'])
-# @authorization_required
 def get_leagues():
     try:
         leagues = Leagues.query.all()
@@ -106,7 +71,6 @@ def get_leagues():
         return make_response(jsonify({'message': 'Error getting leagues', 'error': str(e)}), 500)
 
 @app.route('/matches/<int:id>', methods=['GET'])
-# @authorization_required
 def get_match(id):
     try:
         match = Matches.query.get(id)
@@ -116,9 +80,7 @@ def get_match(id):
     except Exception as e:
         return make_response(jsonify({'message': 'Error getting match', 'error': str(e)}), 500)
 
-    
 @app.route('/matches/<int:id>', methods=['PUT'])
-# @authorization_required
 def update_match(id):
     try:
         match = Matches.query.get(id)
@@ -132,9 +94,7 @@ def update_match(id):
     except Exception as e:
         return make_response(jsonify({'message': 'Error updating match', 'error': str(e)}), 500)
 
-
 @app.route('/matches/<int:id>', methods=['DELETE'])
-# @authorization_required
 def delete_match(id):
     try:
         match = Matches.query.get(id)
@@ -146,6 +106,30 @@ def delete_match(id):
     except Exception as e:
         return make_response(jsonify({'message': 'Error deleting match', 'error': str(e)}), 500)
 
+# New endpoint to get matches by league name
+@app.route('/matches/by-league', methods=['GET'])
+def get_matches_by_league():
+    try:
+        app.logger.info("Received request for matches by league")
+        
+        league_name = request.args.get('league_name')
+        app.logger.info(f"League name received: {league_name}")
+
+        if not league_name:
+            app.logger.warning("League name is missing")
+            return make_response(jsonify({'message': 'League name is required'}), 400)
+
+        league = Leagues.query.filter_by(name=league_name).first()
+        if not league:
+            app.logger.warning(f"League not found: {league_name}")
+            return make_response(jsonify({'message': 'League not found'}), 404)
+
+        matches = Matches.query.filter_by(league_id=league.id).all()
+        return make_response(jsonify([match.json() for match in matches]), 200)
+    except Exception as e:
+        app.logger.error(f"Error getting matches: {str(e)}")
+        return make_response(jsonify({'message': 'Error getting matches', 'error': str(e)}), 500)
+
 
 import crawler
 import crawler2
@@ -154,7 +138,6 @@ app.logger.info("main")
 with app.app_context():
     db.create_all()
     crawler.main(app, db)
-    # crawler2.main_loop(app, db)
     crawler3.main_loop(app, db)
     
     app.run(debug=True)

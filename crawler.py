@@ -25,8 +25,8 @@ app: Flask = None
 def insert_default_leagues():
     default_leagues = [
         {"name": "Basketball", "url": "https://basketball28.sportshub.stream/"},
-        # {"name": "Soccer", "url": "https://reddit15.sportshub.stream"},
-        # {"name": "Volleyball", "url": "https://volleyball3.sportshub.stream/"},
+        {"name": "Soccer", "url": "https://reddit15.sportshub.stream"},
+        {"name": "Volleyball", "url": "https://volleyball3.sportshub.stream/"},
     ]
 
     for league_info in default_leagues:
@@ -173,6 +173,6 @@ def main(appArg: Flask, dbArg: SQLAlchemy):
             db.session.close()
 
 if __name__ == '__main__':
-    scheduler.add_job(main, 'interval', minutes=1, args=[db, app])
-    scheduler.add_job(remove_expired_matches, 'interval', minutes=30)
+    scheduler.add_job(main, 'interval', minutes=5, args=[db, app])
+    scheduler.add_job(remove_expired_matches, 'interval', hours=1)
     scheduler.start()
