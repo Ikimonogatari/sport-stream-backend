@@ -24,9 +24,9 @@ app: Flask = None
 
 def insert_default_leagues():
     default_leagues = [
-        {"name": "Basketball", "url": "https://get.rnbastreams.com"},
-        {"name": "Soccer", "url": "https://reddit15.sportshub.stream"},
-        {"name": "Volleyball", "url": "https://volleyball3.sportshub.stream/"},
+        {"name": "Basketball", "url": "https://basketball28.sportshub.stream/"},
+        # {"name": "Soccer", "url": "https://reddit15.sportshub.stream"},
+        # {"name": "Volleyball", "url": "https://volleyball3.sportshub.stream/"},
     ]
 
     for league_info in default_leagues:
@@ -50,96 +50,26 @@ def setup_driver():
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
-def scheduleNbaCrawler(driver, league):
-    print("BASKETBALL CRAWLER", file=sys.stderr)
-
-    driver.get(league.url)
-    wait = WebDriverWait(driver, 10)
-
-    try:
-        contentDiv = wait.until(EC.presence_of_element_located((By.ID, 'content')))
-
-        # Crawl day
-        header = contentDiv.find_element(By.CSS_SELECTOR, ".header")
-        dayH2 = header.find_element(By.TAG_NAME, 'h2').text
-        # Crawl match
-        fixtures = contentDiv.find_element(By.ID, "fixtures")
-        fixturesUl = fixtures.find_element(By.CSS_SELECTOR, ".competitions")
-        fixturesLis = fixturesUl.find_elements(By.TAG_NAME, 'li')
-
-        for li in fixturesLis:
-            team1Name = li.find_element(By.CSS_SELECTOR, '.competition-cell-side1').text
-            team2Name = li.find_element(By.CSS_SELECTOR, '.competition-cell-side2').text
-            matchTimeSpan = li.find_element(By.CSS_SELECTOR, '.competition-cell-score')
-            matchTime = matchTimeSpan.find_element(By.TAG_NAME, "span").text
-            matchTime_no_tz = matchTime.replace(" EST", "")
-            time_str = matchTime_no_tz + " " + dayH2
-            matchTimeConverted = convert_to_utc_psql_format(time_str)
-            matchURL = li.find_element(By.TAG_NAME, "a").get_attribute("href")
-
-            isLive = bool(li.find_elements(By.CLASS_NAME, 'live-label'))
-
-            existing_match = Matches.query.filter_by(
-                team1name=team1Name,
-                team2name=team2Name,
-                time=matchTime,
-                link=matchURL,
-                date=time_str,
-                league_id=league.id  # Use dynamic league ID
-            ).first()
-
-            if not existing_match:
-                new_match = Matches(
-                    team1name=team1Name,
-                    team2name=team2Name,
-                    time=matchTime,
-                    link=matchURL,
-                    date=time_str,
-                    league_id=league.id,  # Use dynamic league ID
-                    datetime=matchTimeConverted,
-                    isLive=isLive
-                )
-                db.session.add(new_match)
-            elif isLive and not existing_match.isLive:
-                existing_match.isLive = True  # Update the match to live
-
-        db.session.commit()
-    except Exception as e:
-        print(f"An error occurred during web scraping for {league.name}:", e, file=sys.stderr)
-        db.session.rollback()
-    finally:
-        driver.quit()
-
-
-
 def scheduleCrawler(driver, league):
-    print("SOCCER CRAWLER HERE", file=sys.stderr)
+    logger.info(f"Starting crawler for {league.name}")
 
-    print(league.url, file=sys.stderr)
     driver.get(league.url)
     wait = WebDriverWait(driver, 10)
 
     try:
         contentDiv = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'list-events')))
-        print("CONTENT DIV", contentDiv, file=sys.stderr)
+        logger.info("Content div found")
 
         day = contentDiv.find_element(By.TAG_NAME, 'h4').text
 
         fixturesLis = contentDiv.find_elements(By.CLASS_NAME, 'wrap-events-item')
-        print("LIST DIV", fixturesLis, file=sys.stderr)
+        logger.info(f"Found {len(fixturesLis)} fixtures")
 
         for li in fixturesLis:
             team1Name = li.find_element(By.CLASS_NAME, 'mr-5').text
-            print("Team names", team1Name, file=sys.stderr)
-
             matchURL = li.find_element(By.TAG_NAME, "a").get_attribute("href")
-            print("MATCH URL", matchURL, file=sys.stderr)
-
-            matchDate = li.find_element(By.CLASS_NAME, 'event-desc')
-            print("MATCH DATE", matchDate.text, file=sys.stderr)
-
-            matchDateConverted = convert_buff_to_utc_psql_format(matchDate.text)
-            print("MATCH DATE CONV", matchDateConverted, file=sys.stderr)
+            matchDate = li.find_element(By.CLASS_NAME, 'event-desc').text
+            matchDateConverted = convert_buff_to_utc_psql_format(matchDate)
 
             isLive = bool(li.find_elements(By.CLASS_NAME, 'live-label'))
 
@@ -148,9 +78,9 @@ def scheduleCrawler(driver, league):
                 link=matchURL,
                 date=day,
                 datetime=matchDateConverted,
-                league_id=league.id  # Use dynamic league ID
+                league_id=league.id
             ).first()
-            print("EXISTING MATCH", existing_match, file=sys.stderr)
+
             if not existing_match:
                 new_match = Matches(
                     team1name=team1Name,
@@ -159,58 +89,39 @@ def scheduleCrawler(driver, league):
                     link=matchURL,
                     date=day,
                     datetime=matchDateConverted,
-                    league_id=league.id,  # Use dynamic league ID
+                    league_id=league.id,
                     isLive=isLive
                 )
-                print("NEW MATCH TO ADD", new_match, file=sys.stderr)
                 db.session.add(new_match)
-                print("SINGLE SOCCER MATCH +", file=sys.stderr)
+                logger.info("Added new match")
             elif isLive and not existing_match.isLive:
-                existing_match.isLive = True  # Update the match to live
+                existing_match.isLive = True
+                logger.info("Updated match to live")
 
         db.session.commit()
-        print("SOCCER MATCHES ADDED", file=sys.stderr)
     except Exception as e:
-        print(f"An error occurred during web scraping for {league.name}:", e, file=sys.stderr)
+        logger.error(f"An error occurred during web scraping for {league.name}: {str(e)}")
         db.session.rollback()
     finally:
         driver.quit()
 
-
-
 def convert_buff_to_utc_psql_format(date_str):
-    print("date1",date_str, file=sys.stderr)
-
-    # Extract the date and time text after the delimiter "/"
     _, date_time_text = date_str.split("/", 1)
-   
-    date_time_text = date_time_text.strip()  # Remove any leading/trailing whitespace
-    print("date2",date_time_text, file=sys.stderr)
-    # Extract the full date and time string components
+    date_time_text = date_time_text.strip()
     date_part, time_part = date_time_text.split(" at ")
     date_part = date_part.strip()
     time_part = time_part.strip()
-    
-    # Construct the full datetime string
+
     current_year = datetime.now().year
     full_date_str = f"{time_part} {date_part} {current_year}"
-    
-    # Define the format string to match the constructed date string
     date_format = "%H:%M %d %B %Y"
-    
-    # Parse the datetime string
     naive_datetime = datetime.strptime(full_date_str, date_format)
-    
-    # Localize to Eastern Time Zone
+
     est = pytz.timezone('US/Eastern')
     aware_datetime = est.localize(naive_datetime)
-    
-    # Convert to UTC
     utc_datetime = aware_datetime.astimezone(pytz.utc)
-    
-    # Format for PostgreSQL
     psql_compatible_string = utc_datetime.strftime('%Y-%m-%dT%H:%M:%S%z')
-    
+
     return psql_compatible_string
 
 def convert_to_utc_psql_format(date_str):
@@ -226,26 +137,18 @@ def convert_to_utc_psql_format(date_str):
 def remove_expired_matches():
     with app.app_context():
         try:
-            # Calculate the expiration time for matches (e.g., matches older than 6 hours)
             expiration_time = datetime.utcnow() - timedelta(hours=6)
-
-            # Query the database for matches that have exceeded the expiration time
             expired_matches = db.session.query(Matches).filter(Matches.datetime < expiration_time).all()
 
             if expired_matches:
-                # Iterate over the expired matches
                 for match in expired_matches:
-                    # Query and delete the stream sources associated with the expired match
                     db.session.query(Matches).filter(Matches.match_id == match.id).delete()
 
-                # Commit the changes to the database
                 db.session.commit()
                 logger.info(f"Removed stream sources associated with {len(expired_matches)} expired matches.")
             else:
                 logger.info("No expired matches found.")
-
         except Exception as e:
-            # Rollback in case of any error
             db.session.rollback()
             logger.error(f"Error occurred while removing expired stream sources: {str(e)}")
 
@@ -258,29 +161,18 @@ def main(appArg: Flask, dbArg: SQLAlchemy):
         insert_default_leagues()
 
         try:
-            # Initialize the Chrome webdriver using the updated path
-            nbaleague = Leagues.query.filter_by(name="Basketball").first()
-            if nbaleague:
-                driver = setup_driver()
-                scheduleNbaCrawler(driver, nbaleague)  # Pass the basketball league object
-                print("NBA MATCHES ADDED", file=sys.stderr)
-
-            # Get all leagues except the basketball league
             other_leagues = Leagues.query.filter(Leagues.name != "Basketball").all()
 
-            # Schedule crawlers for the other leagues
             for league in other_leagues:
                 driver = setup_driver()
                 scheduleCrawler(driver, league)
-                print(f"{league.name} MATCHES ADDED", file=sys.stderr)
-
+                logger.info(f"{league.name} matches added")
         except Exception as e:
-            print("Failed to connect to database or run crawler:", e, file=sys.stderr)
-        
+            logger.error(f"Failed to connect to database or run crawler: {str(e)}")
         finally:
             db.session.close()
 
 if __name__ == '__main__':
-    scheduler.add_job(main, 'interval', hours=6, args=[db, app])
-    scheduler.add_job(remove_expired_matches, 'interval', hours=6) 
+    scheduler.add_job(main, 'interval', minutes=1, args=[db, app])
+    scheduler.add_job(remove_expired_matches, 'interval', minutes=30)
     scheduler.start()

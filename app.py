@@ -154,7 +154,7 @@ app.logger.info("main")
 with app.app_context():
     db.create_all()
     crawler.main(app, db)
-    crawler2.main_loop(app, db)
-    # crawler3.main_loop(app, db)
+    # crawler2.main_loop(app, db)
+    crawler3.main_loop(app, db)
     
     app.run(debug=True)
