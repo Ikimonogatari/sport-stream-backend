@@ -97,5 +97,5 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     app = appArg
     db = dbArg
     print(f"Running stream source crawler 3 at {datetime.now()}", file=sys.stderr)
-    scheduler.add_job(main, 'interval', minutes=10, args=[db, app])
+    scheduler.add_job(main, 'interval', minutes=5, args=[db, app])
     scheduler.start()
