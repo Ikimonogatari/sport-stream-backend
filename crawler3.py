@@ -26,7 +26,7 @@ def get_live_links(driver, match_url):
     links = []
     driver.get(match_url)
     try:
-        contentDiv = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, 'content-event')))
+        contentDiv = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, 'content-event')))
         l_list = contentDiv.find_elements(By.TAG_NAME, 'a')
         for l in l_list:
             links.append(l.get_attribute('href'))
@@ -39,7 +39,7 @@ def get_stream_sources(driver, links):
     for link in links:
         driver.get(link)
         try:
-            contentDiv = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'box-responsive')))
+            contentDiv = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, 'box-responsive')))
             
             video_src = None
             iframe_src = None
@@ -97,5 +97,5 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     app = appArg
     db = dbArg
     print(f"Running stream source crawler 3 at {datetime.now()}", file=sys.stderr)
-    scheduler.add_job(main, 'interval', minutes=5, args=[db, app])
+    scheduler.add_job(main, 'interval', minutes=10, args=[db, app])
     scheduler.start()

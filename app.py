@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, make_response
+from flask_cors import CORS
 from os import environ
 import logging
 from models import Matches, Leagues, StreamSources
@@ -9,6 +10,8 @@ app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('DB_URL')
 db.init_app(app)
+
+CORS(app, supports_credentials=True)
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -145,7 +148,6 @@ def get_stream_sources_for_match(match_id):
         return make_response(jsonify({'message': 'Error getting stream sources', 'error': str(e)}), 500)
 
 import crawler
-import crawler2
 import crawler3
 app.logger.info("main")
 with app.app_context():

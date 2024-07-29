@@ -21,3 +21,4 @@ wsproto
 pytz
 webdriver_manager
 apscheduler
+flask-cors
