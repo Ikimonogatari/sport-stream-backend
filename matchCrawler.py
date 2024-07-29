@@ -94,13 +94,12 @@ def scheduleCrawler(driver, league, live_matches_tracker):
         fixturesLis = contentDiv.find_elements(By.CLASS_NAME, 'wrap-events-item')
         logger.info(f"Found {len(fixturesLis)} fixtures")
 
-        new_live_matches = {}
-
         for li in fixturesLis:
             team1Name = li.find_element(By.CLASS_NAME, 'mr-5').text
             matchURL = li.find_element(By.TAG_NAME, "a").get_attribute("href")
-            matchDate = li.find_element(By.CLASS_NAME, 'event-desc').text
-            matchDateConverted = convert_buff_to_utc_psql_format(matchDate)
+            matchDesc = li.find_element(By.CLASS_NAME, 'event-desc').text
+            
+            description, matchDateConverted = extract_desc_and_date(matchDesc)
 
             isLive = bool(li.find_elements(By.CLASS_NAME, 'live-label'))
 
@@ -109,33 +108,27 @@ def scheduleCrawler(driver, league, live_matches_tracker):
                 link=matchURL,
                 date=day,
                 datetime=matchDateConverted,
-                league_id=league.id
+                league_id=league.id,
+                description=description
             ).first()
 
             if not existing_match:
                 new_match = Matches(
                     team1name=team1Name,
                     team2name="",
-                    time="",
                     link=matchURL,
+                    time="",
                     date=day,
                     datetime=matchDateConverted,
                     league_id=league.id,
-                    isLive=isLive
+                    isLive=isLive,
+                    description=description,
+                    last_crawl_time=None,
                 )
                 db.session.add(new_match)
                 logger.info("Added new match")
-                if isLive:
-                    new_live_matches[new_match.id] = new_match
-            elif isLive and not existing_match.isLive:
-                existing_match.isLive = True
-                new_live_matches[existing_match.id] = existing_match
-                logger.info("Updated match to live")
 
         db.session.commit()
-
-        # Update the live matches tracker
-        live_matches_tracker.update(new_live_matches)
 
     except Exception as e:
         logger.error(f"An error occurred during web scraping for {league.name}: {str(e)}")
@@ -143,66 +136,70 @@ def scheduleCrawler(driver, league, live_matches_tracker):
     finally:
         driver.quit()
 
-def convert_buff_to_utc_psql_format(date_str):
-    _, date_time_text = date_str.split("/", 1)
+def extract_desc_and_date(desc_str):
+    # Split the description and date
+    description_part, date_time_text = desc_str.split("/", 1)
+    description_part = description_part.strip()
     date_time_text = date_time_text.strip()
+
     date_part, time_part = date_time_text.split(" at ")
     date_part = date_part.strip()
     time_part = time_part.strip()
 
+    # Define the current year and build the full date string
     current_year = datetime.now().year
     full_date_str = f"{time_part} {date_part} {current_year}"
     date_format = "%H:%M %d %B %Y"
+
+    # Parse the date string to a naive datetime object
     naive_datetime = datetime.strptime(full_date_str, date_format)
 
-    est = pytz.timezone('US/Eastern')
-    aware_datetime = est.localize(naive_datetime)
-    utc_datetime = aware_datetime.astimezone(pytz.utc)
-    psql_compatible_string = utc_datetime.strftime('%Y-%m-%dT%H:%M:%S%z')
+    # Define the timezone for England (London) and Mongolia
+    england_tz = pytz.timezone('Europe/London')
+    mongolia_tz = pytz.timezone('Asia/Ulaanbaatar')
 
-    return psql_compatible_string
+    # Localize the naive datetime to England timezone and then convert to Mongolia timezone
+    aware_datetime_england = england_tz.localize(naive_datetime)
+    aware_datetime_mongolia = aware_datetime_england.astimezone(mongolia_tz)
 
-def convert_to_utc_psql_format(date_str):
-    date_format = "%H:%M %a %d %b %Y"
-    naive_datetime = datetime.strptime(date_str, date_format)
-    est = pytz.timezone('US/Eastern')
-    aware_datetime = est.localize(naive_datetime)
-    utc_datetime = aware_datetime.astimezone(pytz.utc)
-    psql_compatible_string = utc_datetime.strftime('%Y-%m-%dT%H:%M:%S%z')
+    # Convert to PostgreSQL compatible string format
+    psql_compatible_string = aware_datetime_mongolia.strftime('%Y-%m-%dT%H:%M:%S%z')
 
-    return psql_compatible_string
+    return description_part, psql_compatible_string
 
 def remove_expired_live_matches(db: SQLAlchemy, app: Flask):
-    print("REMOVING EXPIRED MATCHES", file=sys.stderr)
+    print("Removing expired matches", file=sys.stderr)
 
     with app.app_context():
         try:
             # Determine the current time and the expiration threshold
             current_time = datetime.utcnow()
-            expiration_threshold = current_time - timedelta(hours=6)
+            expiration_threshold = current_time - timedelta(hours=1)
             
-            # Find and remove expired matches
+            # Find matches that have exceeded the expiration threshold
             expired_matches = db.session.query(Matches).filter(Matches.datetime < expiration_threshold).all()
             
-            if expired_matches:
-                for match in expired_matches:
-                    # Remove from the live_matches_tracker if it exists
-                    if match.id in live_matches_tracker:
-                        del live_matches_tracker[match.id]
-
-                    # Remove related stream sources
-                    db.session.query(StreamSources).filter(StreamSources.match_id == match.id).delete()
-
+            for match in expired_matches:
+                # Check if the match has no associated stream sources
+                stream_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
+                
+                if not stream_sources:
                     # Remove the match itself
                     db.session.delete(match)
+                    logger.info(f"Removed expired match {match.id} with no stream sources.")
+                    
+                    # Remove related stream sources (if any)
+                    db.session.query(StreamSources).filter(StreamSources.match_id == match.id).delete()
+                    
+            # Commit changes only after processing all matches
+            db.session.commit()
 
-                db.session.commit()
-                logger.info(f"Removed {len(expired_matches)} expired matches and their associated stream sources.")
-            else:
+            if not expired_matches:
                 logger.info("No expired matches found.")
         except Exception as e:
             db.session.rollback()
             logger.error(f"Error occurred while removing expired live matches: {str(e)}")
+
 
 def main(db: SQLAlchemy, app: Flask):
     global live_matches_tracker
@@ -226,7 +223,6 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     global db, app
     app = appArg
     db = dbArg
-    scheduler.add_job(main, 'interval', minutes=10, args=[db, app])
-    scheduler.add_job(remove_expired_live_matches, 'interval', minutes=1, args=[db, app])
+    scheduler.add_job(main, 'interval', days=1, args=[db, app])
+    scheduler.add_job(remove_expired_live_matches, 'interval', minutes=5, args=[db, app])
     scheduler.start()
-

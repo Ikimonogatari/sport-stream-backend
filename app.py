@@ -15,7 +15,6 @@ CORS(app, supports_credentials=True)
 
 logging.basicConfig(level=logging.DEBUG)
 
-# CRUD operations for matches
 @app.route('/matches', methods=['POST'])
 def create_match():
     try:
@@ -109,7 +108,6 @@ def delete_match(id):
     except Exception as e:
         return make_response(jsonify({'message': 'Error deleting match', 'error': str(e)}), 500)
 
-# New endpoint to get matches by league name
 @app.route('/matches/by-league', methods=['GET'])
 def get_matches_by_league():
     try:
@@ -133,7 +131,6 @@ def get_matches_by_league():
         app.logger.error(f"Error getting matches: {str(e)}")
         return make_response(jsonify({'message': 'Error getting matches', 'error': str(e)}), 500)
 
-# New endpoint to get stream sources for a specific match
 @app.route('/matches/<int:match_id>/stream_sources', methods=['GET'])
 def get_stream_sources_for_match(match_id):
     try:
@@ -147,12 +144,12 @@ def get_stream_sources_for_match(match_id):
         app.logger.error(f"Error getting stream sources for match: {str(e)}")
         return make_response(jsonify({'message': 'Error getting stream sources', 'error': str(e)}), 500)
 
-import crawler
-import crawler3
+import matchCrawler
+import streamSourceCrawler
 app.logger.info("main")
 with app.app_context():
     db.create_all()
-    crawler.main_loop(app, db)
-    crawler3.main_loop(app, db)
+    matchCrawler.main_loop(app, db)
+    streamSourceCrawler.main_loop(app, db)
     
     app.run(debug=True)

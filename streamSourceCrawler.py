@@ -62,8 +62,32 @@ def get_stream_sources(driver, links):
             print("An error occurred:", e, file=sys.stderr)
     return sources
 
+def update_live_status(db: SQLAlchemy):
+    with app.app_context():
+        now = datetime.utcnow()
+        matches_to_update = db.session.query(Matches).filter(
+            Matches.datetime <= now,
+            Matches.isLive == False
+        ).all()
+
+        for match in matches_to_update:
+            match.isLive = True
+            match.last_crawl_time = now
+            db.session.add(match)
+            logger.info(f"Updated match {match.id} to live.")
+
+        db.session.commit()
+        logger.info("Live status update completed.")
+
+
 def main(db: SQLAlchemy, app: Flask):
-    print("CRAWLER 3 HERE", file=sys.stderr)
+    update_live_status(db)
+
+    print("Updated live matches", file=sys.stderr)
+
+    now = datetime.utcnow()
+    thirty_minutes_ago = now - timedelta(minutes=30)
+
     with app.app_context():
         chrome_driver_path = chromedriver_autoinstaller.install()
         chrome_options = Options()
@@ -75,20 +99,22 @@ def main(db: SQLAlchemy, app: Flask):
         chrome_options.add_argument("--disable-browser-side-navigation")
 
         service = Service(executable_path=chrome_driver_path)
-        
+
         with webdriver.Chrome(service=service, options=chrome_options) as driver:
-            live_matches = db.session.query(Matches).filter(Matches.isLive == True).all()
-            print("sources live matches", live_matches, file=sys.stderr)
+            live_matches = db.session.query(Matches).filter(
+                Matches.isLive == True,
+                Matches.last_crawl_time >= thirty_minutes_ago
+            ).all()
 
             for match in live_matches:
-                stream_links = get_live_links(driver, match.link)  # Ensure match has a 'url' attribute
-                stream_sources = get_stream_sources(driver, stream_links)  # Get stream sources from links
+                stream_links = get_live_links(driver, match.link)
+                stream_sources = get_stream_sources(driver, stream_links)
                 for source in stream_sources:
                     existing_source = db.session.query(StreamSources).filter_by(match_id=match.id, link=source).first()
                     if not existing_source:
                         stream_source = StreamSources(match_id=match.id, link=source)
                         db.session.add(stream_source)
-                       
+
         db.session.commit()
         db.session.close()
 
@@ -96,6 +122,6 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     global db, app
     app = appArg
     db = dbArg
-    print(f"Running stream source crawler 3 at {datetime.now()}", file=sys.stderr)
-    scheduler.add_job(main, 'interval', minutes=5, args=[db, app])
+    print(f"Running stream source crawler at {datetime.now()}", file=sys.stderr)
+    scheduler.add_job(main, 'interval', minutes=3, args=[db, app])
     scheduler.start()

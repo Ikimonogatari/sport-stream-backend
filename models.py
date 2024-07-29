@@ -24,7 +24,6 @@ class StreamSources(db.Model):
     match_id = db.Column(db.Integer, db.ForeignKey('matches.id'))
     link = db.Column(db.String)
 
-    # Relationship with Matches table
     match = db.relationship("Matches", back_populates="stream_sources")
     
     def __init__(self, match_id, link):
@@ -45,11 +44,14 @@ class Matches(db.Model):
     league_id = db.Column(db.Integer, db.ForeignKey('leagues.id'))
     datetime = db.Column(db.DateTime, nullable=True)
     isLive = db.Column(db.Boolean, nullable=False, default=False)
+    description = db.Column(db.String, nullable=True) 
+    last_crawl_time = db.Column(db.DateTime, nullable=True, default=None) 
+    
     
     league = db.relationship("Leagues", back_populates="matches")
     stream_sources = db.relationship("StreamSources", back_populates="match", cascade="all, delete-orphan")
 
-    def __init__(self, team1name, team2name, link, time, date, league_id, datetime, isLive=False):
+    def __init__(self, team1name, team2name, link, time, date, league_id, datetime, isLive=False, description=None, last_crawl_time=None):
         self.team1name = team1name
         self.team2name = team2name
         self.link = link
@@ -58,7 +60,10 @@ class Matches(db.Model):
         self.league_id = league_id
         self.datetime = datetime
         self.isLive = isLive
-    
+        self.description = description
+        self.last_crawl_time = last_crawl_time
+
+
     def json(self):
         return {
             'id': self.id,
@@ -69,8 +74,10 @@ class Matches(db.Model):
             'date': self.date,
             'league_id': self.league_id,
             'datetime': self.datetime,
-            'isLive': self.isLive
+            'isLive': self.isLive,
+            'description': self.description
         }
 
     def __repr__(self):
-        return f"<Matches(id={self.id}, team1name='{self.team1name}', team2name='{self.team2name}', isLive={self.isLive})>"
+        return f"<Matches(id={self.id}, team1name='{self.team1name}', team2name='{self.team2name}', isLive={self.isLive}, description='{self.description}')>"
+
