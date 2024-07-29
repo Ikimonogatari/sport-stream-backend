@@ -21,7 +21,6 @@ scheduler = BackgroundScheduler()
 
 db: SQLAlchemy = None
 app: Flask = None
-live_matches_tracker = {}
 
 def insert_default_leagues():
     default_leagues = [
@@ -79,7 +78,7 @@ def setup_driver():
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
-def scheduleCrawler(driver, league, live_matches_tracker):
+def scheduleCrawler(driver, league):
     logger.info(f"Starting crawler for {league.name}")
 
     driver.get(league.url)
@@ -172,13 +171,19 @@ def remove_expired_live_matches(db: SQLAlchemy, app: Flask):
 
     with app.app_context():
         try:
-            # Determine the current time and the expiration threshold
-            current_time = datetime.utcnow()
-            expiration_threshold = current_time - timedelta(hours=1)
-            
-            # Find matches that have exceeded the expiration threshold
+            mongolia_tz = pytz.timezone('Asia/Ulaanbaatar')
+         
+            current_time = datetime.now(mongolia_tz)
+            print(f"Running stream source crawler at {current_time}", file=sys.stderr)
+            expiration_threshold = current_time - timedelta(hours=2)
+         
+            print(f"expire threshold {expiration_threshold}", file=sys.stderr)
+            expiration_threshold = expiration_threshold.replace(microsecond=0).replace(tzinfo=None)
+
+            print(f"expire threshold {expiration_threshold}", file=sys.stderr)
             expired_matches = db.session.query(Matches).filter(Matches.datetime < expiration_threshold).all()
-            
+
+            print("Expired matches are", expired_matches, file=sys.stderr)
             for match in expired_matches:
                 # Check if the match has no associated stream sources
                 stream_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
@@ -186,7 +191,7 @@ def remove_expired_live_matches(db: SQLAlchemy, app: Flask):
                 if not stream_sources:
                     # Remove the match itself
                     db.session.delete(match)
-                    logger.info(f"Removed expired match {match.id} with no stream sources.")
+                    logger.info(f"Removed expired match {match.id} {match.team1name} with no stream sources.")
                     
                     # Remove related stream sources (if any)
                     db.session.query(StreamSources).filter(StreamSources.match_id == match.id).delete()
@@ -200,9 +205,7 @@ def remove_expired_live_matches(db: SQLAlchemy, app: Flask):
             db.session.rollback()
             logger.error(f"Error occurred while removing expired live matches: {str(e)}")
 
-
 def main(db: SQLAlchemy, app: Flask):
-    global live_matches_tracker
 
     with app.app_context():
         insert_default_leagues()
@@ -212,7 +215,7 @@ def main(db: SQLAlchemy, app: Flask):
 
             for league in leagues:
                 driver = setup_driver()
-                scheduleCrawler(driver, league, live_matches_tracker)
+                scheduleCrawler(driver, league)
                 logger.info(f"{league.name} matches added")
         except Exception as e:
             logger.error(f"Failed to connect to database or run crawler: {str(e)}")

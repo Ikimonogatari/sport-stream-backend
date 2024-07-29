@@ -7,6 +7,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from models import StreamSources, Matches
 from datetime import datetime, timedelta
+import pytz
 import chromedriver_autoinstaller
 import sys
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -18,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 scheduler = BackgroundScheduler()
 
+mongolia_tz = pytz.timezone('Asia/Ulaanbaatar')
+
 db: SQLAlchemy = None
 app: Flask = None
 
@@ -26,7 +29,7 @@ def get_live_links(driver, match_url):
     links = []
     driver.get(match_url)
     try:
-        contentDiv = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, 'content-event')))
+        contentDiv = WebDriverWait(driver, 1).until(EC.presence_of_element_located((By.ID, 'content-event')))
         l_list = contentDiv.find_elements(By.TAG_NAME, 'a')
         for l in l_list:
             links.append(l.get_attribute('href'))
@@ -39,7 +42,7 @@ def get_stream_sources(driver, links):
     for link in links:
         driver.get(link)
         try:
-            contentDiv = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, 'box-responsive')))
+            contentDiv = WebDriverWait(driver, 1).until(EC.presence_of_element_located((By.CLASS_NAME, 'box-responsive')))
             
             video_src = None
             iframe_src = None
@@ -63,21 +66,28 @@ def get_stream_sources(driver, links):
     return sources
 
 def update_live_status(db: SQLAlchemy):
+    print("Starting to update live matches", file=sys.stderr)
+
     with app.app_context():
-        now = datetime.utcnow()
-        matches_to_update = db.session.query(Matches).filter(
-            Matches.datetime <= now,
-            Matches.isLive == False
-        ).all()
+        try:
+            current_time_mongolia = datetime.now(mongolia_tz)
+            current_time_mongolia = current_time_mongolia.replace(microsecond=0).replace(tzinfo=None)
+            matches_to_update = Matches.query.filter(
+                Matches.datetime <= current_time_mongolia,
+                Matches.isLive == False
+            ).all()
 
-        for match in matches_to_update:
-            match.isLive = True
-            match.last_crawl_time = now
-            db.session.add(match)
-            logger.info(f"Updated match {match.id} to live.")
-
-        db.session.commit()
-        logger.info("Live status update completed.")
+            print("Matches to update", matches_to_update, file=sys.stderr)
+            
+            for match in matches_to_update:
+                match.isLive = True
+                match.last_crawl_time = current_time_mongolia
+                db.session.commit()
+                logger.info(f"Updated match {match.id} to live and set last crawl time.")
+                
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error occurred while updating live status: {str(e)}")
 
 
 def main(db: SQLAlchemy, app: Flask):
@@ -85,8 +95,8 @@ def main(db: SQLAlchemy, app: Flask):
 
     print("Updated live matches", file=sys.stderr)
 
-    now = datetime.utcnow()
-    thirty_minutes_ago = now - timedelta(minutes=30)
+    current_time_mongolia = datetime.now(mongolia_tz)
+    thirty_minutes_ago = current_time_mongolia - timedelta(minutes=15)
 
     with app.app_context():
         chrome_driver_path = chromedriver_autoinstaller.install()
@@ -105,7 +115,7 @@ def main(db: SQLAlchemy, app: Flask):
                 Matches.isLive == True,
                 Matches.last_crawl_time >= thirty_minutes_ago
             ).all()
-
+            print("Live matches to query", live_matches, file=sys.stderr)
             for match in live_matches:
                 stream_links = get_live_links(driver, match.link)
                 stream_sources = get_stream_sources(driver, stream_links)
@@ -122,6 +132,6 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     global db, app
     app = appArg
     db = dbArg
-    print(f"Running stream source crawler at {datetime.now()}", file=sys.stderr)
-    scheduler.add_job(main, 'interval', minutes=3, args=[db, app])
+    print(f"Running stream source crawler at {datetime.now(mongolia_tz)}", file=sys.stderr)
+    scheduler.add_job(main, 'interval', minutes=5, args=[db, app])
     scheduler.start()

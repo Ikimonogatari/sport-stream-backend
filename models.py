@@ -75,9 +75,10 @@ class Matches(db.Model):
             'league_id': self.league_id,
             'datetime': self.datetime,
             'isLive': self.isLive,
-            'description': self.description
+            'description': self.description,
+            'last_crawl_time': self.last_crawl_time
         }
 
     def __repr__(self):
-        return f"<Matches(id={self.id}, team1name='{self.team1name}', team2name='{self.team2name}', isLive={self.isLive}, description='{self.description}')>"
+        return f"<Matches(id={self.id}, team1name='{self.team1name}', team2name='{self.team2name}', isLive={self.isLive}, description='{self.description}', last_crawl_time='{self.last_crawl_time}')>"
 
