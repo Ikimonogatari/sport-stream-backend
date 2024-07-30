@@ -1,35 +1,23 @@
 FROM python:3.9-slim-buster
 
-# Install dependencies
 RUN apt-get update && \
-    apt-get install -y \
-        libpq-dev \
-        build-essential \
-        wget \
-        gnupg \
-        curl \
-    && rm -rf /var/lib/apt/lists/*
+    apt-get install -y libpq-dev build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
-# Add Google Chrome signing key and repository
-RUN curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-archive-keyring.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/google-archive-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | tee /etc/apt/sources.list.d/google-chrome.list
-
-# Install Google Chrome
-RUN apt-get update && apt-get install -y google-chrome-stable
-
-# Set working directory
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt selenium==4.16.0
 
-# Copy the rest of the application code
+RUN apt-get update && apt-get install -y wget
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+RUN sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+RUN apt-get update && apt-get install -y google-chrome-stable
+RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir selenium==4.16.0
+
 COPY . .
 
-# Expose port and set environment variables
 EXPOSE 4000
-ENV FLASK_ENV=development
 
-# Command to run the application
+ENV FLASK_ENV=development
 CMD ["flask", "run", "--host=0.0.0.0", "--port=4000"]
