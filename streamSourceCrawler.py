@@ -24,7 +24,6 @@ mongolia_tz = pytz.timezone('Asia/Ulaanbaatar')
 db: SQLAlchemy = None
 app: Flask = None
 
-
 def get_live_links(driver, match_url):
     links = []
     driver.get(match_url)
@@ -33,8 +32,11 @@ def get_live_links(driver, match_url):
         l_list = contentDiv.find_elements(By.TAG_NAME, 'a')
         for l in l_list:
             links.append(l.get_attribute('href'))
+        if not links:  # No links found
+            return None
     except Exception as e:
         print("An error occurred:", e, file=sys.stderr)
+        return None
     return links
 
 def get_stream_sources(driver, links):
@@ -89,7 +91,6 @@ def update_live_status(db: SQLAlchemy):
             db.session.rollback()
             logger.error(f"Error occurred while updating live status: {str(e)}")
 
-
 def main(db: SQLAlchemy, app: Flask):
     update_live_status(db)
 
@@ -97,6 +98,7 @@ def main(db: SQLAlchemy, app: Flask):
 
     current_time_mongolia = datetime.now(mongolia_tz)
     thirty_minutes_ago = current_time_mongolia - timedelta(minutes=15)
+    ninety_minutes_ago = current_time_mongolia - timedelta(minutes=90)
 
     with app.app_context():
         chrome_driver_path = chromedriver_autoinstaller.install()
@@ -111,19 +113,33 @@ def main(db: SQLAlchemy, app: Flask):
         service = Service(executable_path=chrome_driver_path)
 
         with webdriver.Chrome(service=service, options=chrome_options) as driver:
-            live_matches = db.session.query(Matches).filter(
+            # Update stream sources for matches crawled in the last 30 minutes
+            live_matches_to_update = db.session.query(Matches).filter(
                 Matches.isLive == True,
                 Matches.last_crawl_time >= thirty_minutes_ago
             ).all()
-            print("Live matches to query", live_matches, file=sys.stderr)
-            for match in live_matches:
+            print("Live matches to update", live_matches_to_update, file=sys.stderr)
+            for match in live_matches_to_update:
                 stream_links = get_live_links(driver, match.link)
-                stream_sources = get_stream_sources(driver, stream_links)
-                for source in stream_sources:
-                    existing_source = db.session.query(StreamSources).filter_by(match_id=match.id, link=source).first()
-                    if not existing_source:
-                        stream_source = StreamSources(match_id=match.id, link=source)
-                        db.session.add(stream_source)
+                if stream_links:
+                    stream_sources = get_stream_sources(driver, stream_links)
+                    for source in stream_sources:
+                        existing_source = db.session.query(StreamSources).filter_by(match_id=match.id, link=source).first()
+                        if not existing_source:
+                            stream_source = StreamSources(match_id=match.id, link=source)
+                            db.session.add(stream_source)
+
+            # Remove stream sources for matches with no live links found for 90 minutes
+            live_matches_to_remove_sources = db.session.query(Matches).filter(
+                Matches.isLive == True,
+                Matches.last_crawl_time < ninety_minutes_ago
+            ).all()
+            print("Live matches to remove sources", live_matches_to_remove_sources, file=sys.stderr)
+            for match in live_matches_to_remove_sources:
+                stream_links = get_live_links(driver, match.link)
+                if not stream_links:
+                    db.session.query(StreamSources).filter_by(match_id=match.id).delete()
+                    logger.info(f"Removed stream sources for match {match.id} due to no live links found for 90 minutes.")
 
         db.session.commit()
         db.session.close()
