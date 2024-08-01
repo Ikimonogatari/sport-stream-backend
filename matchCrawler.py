@@ -88,8 +88,6 @@ def scheduleCrawler(driver, league):
         contentDiv = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'list-events')))
         logger.info("Content div found")
 
-        day = contentDiv.find_element(By.TAG_NAME, 'h4').text
-
         fixturesLis = contentDiv.find_elements(By.CLASS_NAME, 'wrap-events-item')
         logger.info(f"Found {len(fixturesLis)} fixtures")
 
@@ -105,7 +103,6 @@ def scheduleCrawler(driver, league):
             existing_match = Matches.query.filter_by(
                 team1name=team1Name,
                 link=matchURL,
-                date=day,
                 datetime=matchDateConverted,
                 league_id=league.id,
                 description=description
@@ -117,7 +114,7 @@ def scheduleCrawler(driver, league):
                     team2name="",
                     link=matchURL,
                     time="",
-                    date=day,
+                    date="",
                     datetime=matchDateConverted,
                     league_id=league.id,
                     isLive=isLive,
