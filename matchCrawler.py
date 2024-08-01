@@ -184,10 +184,11 @@ def remove_expired_live_matches(db: SQLAlchemy, app: Flask):
             for match in expired_matches:
                 # Check if the match has no associated stream sources
                 stream_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
-                
+                print("Checking if stream source exist", file=sys.stderr)
                 if not stream_sources:
                     # Remove the match itself
                     db.session.delete(match)
+                    print("Removed expired match", {match.id}, file=sys.stderr)
                     logger.info(f"Removed expired match {match.id} {match.team1name} with no stream sources.")
                     
                     # Remove related stream sources (if any)
@@ -223,7 +224,7 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     global db, app
     app = appArg
     db = dbArg
-    main(db, app)
+    # main(db, app)
     scheduler.add_job(main, 'interval', days=1, args=[db, app])
-    scheduler.add_job(remove_expired_live_matches, 'interval', minutes=5, args=[db, app])
+    scheduler.add_job(remove_expired_live_matches, 'interval', seconds=30, args=[db, app])
     scheduler.start()

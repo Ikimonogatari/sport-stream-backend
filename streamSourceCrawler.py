@@ -28,7 +28,7 @@ def get_live_links(driver, match_url):
     links = []
     driver.get(match_url)
     try:
-        contentDiv = WebDriverWait(driver, 1).until(EC.presence_of_element_located((By.ID, 'content-event')))
+        contentDiv = WebDriverWait(driver, 0).until(EC.presence_of_element_located((By.ID, 'content-event')))
         l_list = contentDiv.find_elements(By.TAG_NAME, 'a')
         for l in l_list:
             links.append(l.get_attribute('href'))
@@ -44,7 +44,7 @@ def get_stream_sources(driver, links):
     for link in links:
         driver.get(link)
         try:
-            contentDiv = WebDriverWait(driver, 1).until(EC.presence_of_element_located((By.CLASS_NAME, 'box-responsive')))
+            contentDiv = WebDriverWait(driver, 0).until(EC.presence_of_element_located((By.CLASS_NAME, 'box-responsive')))
             
             video_src = None
             iframe_src = None
@@ -97,7 +97,7 @@ def main(db: SQLAlchemy, app: Flask):
     print("Updated live matches", file=sys.stderr)
 
     current_time_mongolia = datetime.now(mongolia_tz)
-    thirty_minutes_ago = current_time_mongolia - timedelta(minutes=15)
+    thirty_minutes_ago = current_time_mongolia - timedelta(minutes=30)
     ninety_minutes_ago = current_time_mongolia - timedelta(minutes=90)
 
     with app.app_context():
@@ -123,13 +123,22 @@ def main(db: SQLAlchemy, app: Flask):
                 stream_links = get_live_links(driver, match.link)
                 if stream_links:
                     stream_sources = get_stream_sources(driver, stream_links)
-                    for source in stream_sources:
-                        existing_source = db.session.query(StreamSources).filter_by(match_id=match.id, link=source).first()
-                        if not existing_source:
-                            stream_source = StreamSources(match_id=match.id, link=source)
-                            db.session.add(stream_source)
+                    print(f"Match {match.id} stream sources: {stream_sources}", file=sys.stderr)
+                    if stream_sources:
+                        for source in stream_sources:
+                            existing_source = db.session.query(StreamSources).filter_by(match_id=match.id, link=source).first()
+                            if not existing_source:
+                                stream_source = StreamSources(match_id=match.id, link=source)
+                                db.session.add(stream_source)
+                    else:
+                        existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
+                        if existing_sources:
+                            for source in existing_sources:
+                                db.session.delete(source)
+                                print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
+                            logger.info(f"Removed existing stream sources for match {match.id} due to no live sources found.")
 
-            # Remove stream sources for matches with no live links found for 90 minutes
+            # Remove stream sources for matches with no live sources found for 90 minutes
             live_matches_to_remove_sources = db.session.query(Matches).filter(
                 Matches.isLive == True,
                 Matches.last_crawl_time < ninety_minutes_ago
@@ -137,9 +146,19 @@ def main(db: SQLAlchemy, app: Flask):
             print("Live matches to remove sources", live_matches_to_remove_sources, file=sys.stderr)
             for match in live_matches_to_remove_sources:
                 stream_links = get_live_links(driver, match.link)
-                if not stream_links:
-                    db.session.query(StreamSources).filter_by(match_id=match.id).delete()
-                    logger.info(f"Removed stream sources for match {match.id} due to no live links found for 90 minutes.")
+                if stream_links:
+                    stream_sources = get_stream_sources(driver, stream_links)
+                    print(f"Match {match.id} stream sources: {stream_sources}", file=sys.stderr)
+                    if not stream_sources:
+                        stream_sources_to_delete = db.session.query(StreamSources).filter_by(match_id=match.id).all()
+                        print(f"Stream sources to delete for match {match.id}: {stream_sources_to_delete}", file=sys.stderr)
+                        if stream_sources_to_delete:
+                            for source in stream_sources_to_delete:
+                                db.session.delete(source)
+                                print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
+                            logger.info(f"Removed stream sources for match {match.id} due to no live sources found for 90 minutes.")
+                        else:
+                            print(f"No stream sources found for match {match.id} to delete", file=sys.stderr)
 
         db.session.commit()
         db.session.close()

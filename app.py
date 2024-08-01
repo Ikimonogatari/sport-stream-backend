@@ -7,13 +7,13 @@ from database import db
 from datetime import datetime
 
 app = Flask(__name__)
-app.logger.setLevel(logging.INFO)
+# app.logger.setLevel(logging.INFO)
 app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('DB_URL')
 db.init_app(app)
 
 CORS(app, supports_credentials=True)
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 @app.route('/matches', methods=['POST'])
 def create_match():
@@ -152,4 +152,4 @@ with app.app_context():
     matchCrawler.main_loop(app, db)
     streamSourceCrawler.main_loop(app, db)
     
-    app.run(debug=True)
+    app.run(debug=False)
