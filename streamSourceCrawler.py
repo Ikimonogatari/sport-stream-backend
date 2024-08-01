@@ -113,7 +113,6 @@ def main(db: SQLAlchemy, app: Flask):
         service = Service(executable_path=chrome_driver_path)
 
         with webdriver.Chrome(service=service, options=chrome_options) as driver:
-            # Update stream sources for matches crawled in the last 30 minutes
             live_matches_to_update = db.session.query(Matches).filter(
                 Matches.isLive == True,
                 Matches.last_crawl_time >= thirty_minutes_ago
@@ -168,5 +167,5 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     app = appArg
     db = dbArg
     print(f"Running stream source crawler at {datetime.now(mongolia_tz)}", file=sys.stderr)
-    scheduler.add_job(main, 'interval', minutes=5, args=[db, app])
+    scheduler.add_job(main, 'interval', minutes=10, args=[db, app])
     scheduler.start()
