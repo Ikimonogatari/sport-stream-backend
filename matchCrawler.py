@@ -224,7 +224,7 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     global db, app
     app = appArg
     db = dbArg
-    # main(db, app)
+    main(db, app)
     scheduler.add_job(main, 'interval', days=1, args=[db, app])
     scheduler.add_job(remove_expired_live_matches, 'interval', minutes=6, args=[db, app])
     scheduler.start()
