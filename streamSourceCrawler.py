@@ -97,7 +97,7 @@ def main(db: SQLAlchemy, app: Flask):
     print("Updated live matches", file=sys.stderr)
 
     current_time_mongolia = datetime.now(mongolia_tz)
-    thirty_minutes_ago = current_time_mongolia - timedelta(minutes=30)
+    thirty_minutes_ago = current_time_mongolia - timedelta(minutes=60)
     ninety_minutes_ago = current_time_mongolia - timedelta(minutes=90)
 
     chrome_driver_path = chromedriver_autoinstaller.install()
