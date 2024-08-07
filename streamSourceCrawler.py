@@ -100,19 +100,21 @@ def main(db: SQLAlchemy, app: Flask):
     thirty_minutes_ago = current_time_mongolia - timedelta(minutes=30)
     ninety_minutes_ago = current_time_mongolia - timedelta(minutes=90)
 
+    chrome_driver_path = chromedriver_autoinstaller.install()
+    chrome_options = Options()
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--proxy-bypass-list=*")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-browser-side-navigation")
+
+    service = Service(executable_path=chrome_driver_path)
+
     with app.app_context():
-        chrome_driver_path = chromedriver_autoinstaller.install()
-        chrome_options = Options()
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--proxy-bypass-list=*")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-browser-side-navigation")
-
-        service = Service(executable_path=chrome_driver_path)
-
-        with webdriver.Chrome(service=service, options=chrome_options) as driver:
+        driver = None
+        try:
+            driver = webdriver.Chrome(service=service, options=chrome_options)
             live_matches_to_update = db.session.query(Matches).filter(
                 Matches.isLive == True,
                 Matches.last_crawl_time >= thirty_minutes_ago
@@ -159,8 +161,14 @@ def main(db: SQLAlchemy, app: Flask):
                         else:
                             print(f"No stream sources found for match {match.id} to delete", file=sys.stderr)
 
-        db.session.commit()
-        db.session.close()
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error occurred during the main function: {str(e)}")
+        finally:
+            if driver:
+                driver.quit()  # Ensure the browser is properly closed after the job
+            db.session.remove()  # Ensure session is properly removed after the job
 
 def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     global db, app

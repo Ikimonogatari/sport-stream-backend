@@ -131,6 +131,7 @@ def scheduleCrawler(driver, league):
         db.session.rollback()
     finally:
         driver.quit()
+        db.session.remove()
 
 def extract_desc_and_date(desc_str):
     # Split the description and date
@@ -172,7 +173,7 @@ def remove_expired_live_matches(db: SQLAlchemy, app: Flask):
          
             current_time = datetime.now(mongolia_tz)
             print(f"Running stream source crawler at {current_time}", file=sys.stderr)
-            expiration_threshold = current_time - timedelta(hours=2)
+            expiration_threshold = current_time - timedelta(minutes=90)
          
             print(f"expire threshold {expiration_threshold}", file=sys.stderr)
             expiration_threshold = expiration_threshold.replace(microsecond=0).replace(tzinfo=None)
@@ -190,10 +191,7 @@ def remove_expired_live_matches(db: SQLAlchemy, app: Flask):
                     db.session.delete(match)
                     print("Removed expired match", {match.id}, file=sys.stderr)
                     logger.info(f"Removed expired match {match.id} {match.team1name} with no stream sources.")
-                    
-                    # Remove related stream sources (if any)
-                    db.session.query(StreamSources).filter(StreamSources.match_id == match.id).delete()
-                    
+                                        
             # Commit changes only after processing all matches
             db.session.commit()
 
@@ -202,7 +200,8 @@ def remove_expired_live_matches(db: SQLAlchemy, app: Flask):
         except Exception as e:
             db.session.rollback()
             logger.error(f"Error occurred while removing expired live matches: {str(e)}")
-
+        finally: 
+            db.session.remove()
 def main(db: SQLAlchemy, app: Flask):
 
     with app.app_context():
@@ -218,13 +217,13 @@ def main(db: SQLAlchemy, app: Flask):
         except Exception as e:
             logger.error(f"Failed to connect to database or run crawler: {str(e)}")
         finally:
-            db.session.close()
+            db.session.remove()
 
 def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     global db, app
     app = appArg
     db = dbArg
     main(db, app)
-    scheduler.add_job(main, 'interval', days=1, args=[db, app])
+    scheduler.add_job(main, 'interval', hours=1, args=[db, app])
     scheduler.add_job(remove_expired_live_matches, 'interval', minutes=6, args=[db, app])
     scheduler.start()
