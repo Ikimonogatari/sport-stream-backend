@@ -168,7 +168,7 @@ def main(db: SQLAlchemy, app: Flask):
         finally:
             if driver:
                 driver.quit()  # Ensure the browser is properly closed after the job
-            db.session.remove()  # Ensure session is properly removed after the job
+            db.session.close()  # Ensure session is properly removed after the job
 
 def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     global db, app
