@@ -12,12 +12,18 @@ from datetime import datetime, timedelta
 import sys
 import chromedriver_autoinstaller
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.date import DateTrigger
+from apscheduler.executors.pool import ThreadPoolExecutor
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-scheduler = BackgroundScheduler()
+executors = {
+    'default': ThreadPoolExecutor(3)
+}
+mongolia_tz = pytz.timezone('Asia/Ulaanbaatar')
+scheduler = BackgroundScheduler(timezone=mongolia_tz, executors=executors)
 
 db: SQLAlchemy = None
 app: Flask = None
@@ -26,35 +32,35 @@ def insert_default_leagues():
     default_leagues = [
         {"name": "Basketball", "url": "https://basketball28.sportshub.stream/"},
         {"name": "Soccer", "url": "https://reddit15.sportshub.stream"},
-        {"name": "Volleyball", "url": "https://volleyball3.sportshub.stream/"},
-        {"name": "American Football", "url": "https://football2.sportshub.stream/"},
-        {"name": "Tennis", "url": "https://tennis7.sportshub.stream/"},
-        {"name": "Boxing", "url": "https://volleyball3.sportshub.stream/"},
-        {"name": "Fight", "url": "https://mma3.sportshub.stream/"},
-        {"name": "Motorsport", "url": "https://motorsport4.sportshub.stream/"},
-        {"name": "Horse Racing", "url": "https://www.sportshub.stream/horse-racing-streams/"},
-        {"name": "Rugby", "url": "https://rugby2.sportshub.stream/"},
-        {"name": "Cycling", "url": "https://cycling2.sportshub.stream/"},
-        {"name": "Golf", "url": "https://golf2.sportshub.stream/"},
-        {"name": "Snooker", "url": "https://snooker2.sportshub.stream/"},
-        {"name": "Water Sports", "url": "https://www.sportshub.stream/water-sports-streams/"},
-        {"name": "Summer Sports", "url": "https://www.sportshub.stream/summer-sports-streams/"},
-        {"name": "Beach Soccer", "url": "https://www.sportshub.stream/beach-soccer-streams/"},
-        {"name": "Handball", "url": "https://handball3.sportshub.stream/"},
-        {"name": "Athletics", "url": "https://www.sportshub.stream/athletics-streams/"},
-        {"name": "Beach Volleyball", "url": "https://www.sportshub.stream/beach-volley-streams/"},
-        {"name": "Badminton", "url": "https://badminton2.sportshub.stream/"},
-        {"name": "Tabletennis", "url": "https://www.sportshub.stream/table-tennis-streams/"},
-        {"name": "Rowing", "url": "https://www.sportshub.stream/rowing-streams/"},
-        {"name": "Futsal", "url": "https://www.sportshub.stream/futsal-streams/"},
-        {"name": "Winter Sports", "url": "https://www.sportshub.stream/winter-sports-streams/"},
-        {"name": "Curling", "url": "https://www.sportshub.stream/curling-streams/"},
-        {"name": "Hockey", "url": "https://hockey3.sportshub.stream/"},
-        {"name": "NBA", "url": "https://nba37.sportshub.stream/"},
-        {"name": "NHL", "url": "https://nhl5.sportshub.stream/"},
-        {"name": "NFL", "url": "https://nfl2.sportshub.stream/"},
-        {"name": "MLB", "url": "https://mlb2.sportshub.stream/"},
-        {"name": "MLS", "url": "https://mls2.sportshub.stream/"},
+        # {"name": "Volleyball", "url": "https://volleyball3.sportshub.stream/"},
+        # {"name": "American Football", "url": "https://football2.sportshub.stream/"},
+        # {"name": "Tennis", "url": "https://tennis7.sportshub.stream/"},
+        # {"name": "Boxing", "url": "https://volleyball3.sportshub.stream/"},
+        # {"name": "Fight", "url": "https://mma3.sportshub.stream/"},
+        # {"name": "Motorsport", "url": "https://motorsport4.sportshub.stream/"},
+        # {"name": "Horse Racing", "url": "https://www.sportshub.stream/horse-racing-streams/"},
+        # {"name": "Rugby", "url": "https://rugby2.sportshub.stream/"},
+        # {"name": "Cycling", "url": "https://cycling2.sportshub.stream/"},
+        # {"name": "Golf", "url": "https://golf2.sportshub.stream/"},
+        # {"name": "Snooker", "url": "https://snooker2.sportshub.stream/"},
+        # {"name": "Water Sports", "url": "https://www.sportshub.stream/water-sports-streams/"},
+        # {"name": "Summer Sports", "url": "https://www.sportshub.stream/summer-sports-streams/"},
+        # {"name": "Beach Soccer", "url": "https://www.sportshub.stream/beach-soccer-streams/"},
+        # {"name": "Handball", "url": "https://handball3.sportshub.stream/"},
+        # {"name": "Athletics", "url": "https://www.sportshub.stream/athletics-streams/"},
+        # {"name": "Beach Volleyball", "url": "https://www.sportshub.stream/beach-volley-streams/"},
+        # {"name": "Badminton", "url": "https://badminton2.sportshub.stream/"},
+        # {"name": "Tabletennis", "url": "https://www.sportshub.stream/table-tennis-streams/"},
+        # {"name": "Rowing", "url": "https://www.sportshub.stream/rowing-streams/"},
+        # {"name": "Futsal", "url": "https://www.sportshub.stream/futsal-streams/"},
+        # {"name": "Winter Sports", "url": "https://www.sportshub.stream/winter-sports-streams/"},
+        # {"name": "Curling", "url": "https://www.sportshub.stream/curling-streams/"},
+        # {"name": "Hockey", "url": "https://hockey3.sportshub.stream/"},
+        # {"name": "NBA", "url": "https://nba37.sportshub.stream/"},
+        # {"name": "NHL", "url": "https://nhl5.sportshub.stream/"},
+        # {"name": "NFL", "url": "https://nfl2.sportshub.stream/"},
+        # {"name": "MLB", "url": "https://mlb2.sportshub.stream/"},
+        # {"name": "MLS", "url": "https://mls2.sportshub.stream/"},
     ]
 
     for league_info in default_leagues:
@@ -77,6 +83,42 @@ def setup_driver():
     service = Service(executable_path=chrome_driver_path)
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
+
+def schedule_next_live_update(db: SQLAlchemy, app: Flask):
+    print("Scheduling update match to live")
+    with app.app_context():
+        current_time_mongolia = datetime.now(mongolia_tz)
+        current_time_mongolia = current_time_mongolia.replace(microsecond=0).replace(tzinfo=None)
+        upcoming_match = Matches.query.filter(Matches.isLive == False).order_by(Matches.datetime).first()
+        
+        print(upcoming_match, "UPCOMING MATCH")
+        if upcoming_match:
+            next_match_time = upcoming_match.datetime
+            print(next_match_time, "NEXT MATCH TIME")
+            print(current_time_mongolia, "CURRENT MGL TIME")
+            # Schedule a one-time job for when the match should go live
+            scheduler.add_job(update_live_status, run_date=next_match_time, args=[db, app])
+            logger.info(f"set sched 6969 {upcoming_match.id} at {next_match_time}")
+            print("Jobs:", scheduler.get_jobs())
+        else:
+            logger.info("No upcoming matches to schedule.")
+
+def update_live_status(db: SQLAlchemy, app: Flask):
+    print("Updating live status")
+
+    with app.app_context():
+        # Set current time and update live matches
+        current_time_mongolia = datetime.now(mongolia_tz)
+        current_time_mongolia = current_time_mongolia.replace(microsecond=0).replace(tzinfo=None)
+        matches_to_update = Matches.query.filter(Matches.datetime <= current_time_mongolia, Matches.isLive == False).all()
+        
+        for match in matches_to_update:
+            match.isLive = True
+        
+        db.session.commit()
+
+        # Schedule the next live update based on the next match
+        schedule_next_live_update(db, app)        
 
 def scheduleCrawler(driver, league):
     logger.info(f"Starting crawler for {league.name}")
@@ -163,45 +205,6 @@ def extract_desc_and_date(desc_str):
 
     return description_part, psql_compatible_string
 
-def remove_expired_live_matches(db: SQLAlchemy, app: Flask):
-    print("Removing expired matches", file=sys.stderr)
-
-    with app.app_context():
-        try:
-            mongolia_tz = pytz.timezone('Asia/Ulaanbaatar')
-         
-            current_time = datetime.now(mongolia_tz)
-            print(f"Running stream source crawler at {current_time}", file=sys.stderr)
-            expiration_threshold = current_time - timedelta(minutes=90)
-         
-            print(f"expire threshold {expiration_threshold}", file=sys.stderr)
-            expiration_threshold = expiration_threshold.replace(microsecond=0).replace(tzinfo=None)
-
-            print(f"expire threshold {expiration_threshold}", file=sys.stderr)
-            expired_matches = db.session.query(Matches).filter(Matches.datetime < expiration_threshold).all()
-
-            print("Expired matches are", expired_matches, file=sys.stderr)
-            for match in expired_matches:
-                # Check if the match has no associated stream sources
-                stream_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
-                print("Checking if stream source exist", file=sys.stderr)
-                if not stream_sources:
-                    # Remove the match itself
-                    db.session.delete(match)
-                    print("Removed expired match", {match.id}, file=sys.stderr)
-                    logger.info(f"Removed expired match {match.id} {match.team1name} with no stream sources.")
-                                        
-            # Commit changes only after processing all matches
-            db.session.commit()
-
-            if not expired_matches:
-                logger.info("No expired matches found.")
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error occurred while removing expired live matches: {str(e)}")
-        finally: 
-            db.session.close()
-
 def main(db: SQLAlchemy, app: Flask):
 
     with app.app_context():
@@ -223,7 +226,7 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     global db, app
     app = appArg
     db = dbArg
-    main(db, app)
-    scheduler.add_job(main, 'interval', hours=6, args=[db, app])
-    scheduler.add_job(remove_expired_live_matches, 'interval', minutes=16, args=[db, app])
+    # main(db, app)
+    update_live_status(db, app)
+    # scheduler.add_job(main, 'interval', hours=24, args=[db, app])
     scheduler.start()

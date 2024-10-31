@@ -11,31 +11,48 @@ import pytz
 import chromedriver_autoinstaller
 import sys
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.executors.pool import ThreadPoolExecutor
+
 from flask import Flask
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-scheduler = BackgroundScheduler()
+executors = {
+    'default': ThreadPoolExecutor(1)
+}
+scheduler = BackgroundScheduler(executors=executors)
 
 mongolia_tz = pytz.timezone('Asia/Ulaanbaatar')
 
 db: SQLAlchemy = None
 app: Flask = None
 
+def parse_datetime_string(datetime_str):
+    # Parse the string into a datetime object, assuming it is in GMT
+    return datetime.strptime(datetime_str, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=pytz.UTC)
+
+def filter_valid_links(links):
+    unwanted_substrings = ["adobe", "get.adobe.com"]
+    valid_links = [link for link in links if not any(sub in link for sub in unwanted_substrings)]
+    return valid_links
+
 def get_live_links(driver, match_url):
     links = []
     driver.get(match_url)
     try:
-        contentDiv = WebDriverWait(driver, 0).until(EC.presence_of_element_located((By.ID, 'content-event')))
+        contentDiv = WebDriverWait(driver, 0).until(EC.presence_of_element_located((By.ID, 'links_block')))
         l_list = contentDiv.find_elements(By.TAG_NAME, 'a')
         for l in l_list:
             links.append(l.get_attribute('href'))
-        if not links:  # No links found
+        links = list(set(links))  # Remove duplicates
+        links = filter_valid_links(links)  # Filter out unwanted links
+        if not links:
+            print(f"No valid stream links found for {match_url}", file=sys.stderr)
             return None
     except Exception as e:
-        print("An error occurred:", e, file=sys.stderr)
+        print(f"An error occurred while fetching links from {match_url}: {e}", file=sys.stderr)
         return None
     return links
 
@@ -67,38 +84,33 @@ def get_stream_sources(driver, links):
             print("An error occurred:", e, file=sys.stderr)
     return sources
 
-def update_live_status(db: SQLAlchemy):
-    print("Starting to update live matches", file=sys.stderr)
+# def update_live_status(db: SQLAlchemy):
+#     print("Starting to update live matches", file=sys.stderr)
 
-    with app.app_context():
-        try:
-            current_time_mongolia = datetime.now(mongolia_tz)
-            current_time_mongolia = current_time_mongolia.replace(microsecond=0).replace(tzinfo=None)
-            matches_to_update = Matches.query.filter(
-                Matches.datetime <= current_time_mongolia,
-                Matches.isLive == False
-            ).all()
+#     with app.app_context():
+#         try:
+#             current_time_mongolia = datetime.now(mongolia_tz)
+#             current_time_mongolia = current_time_mongolia.replace(microsecond=0).replace(tzinfo=None)
+#             matches_to_update = Matches.query.filter(
+#                 Matches.datetime <= current_time_mongolia,
+#                 Matches.isLive == False
+#             ).all()
 
-            print("Matches to update", matches_to_update, file=sys.stderr)
+#             print("Matches to update", matches_to_update, file=sys.stderr)
             
-            for match in matches_to_update:
-                match.isLive = True
-                match.last_crawl_time = current_time_mongolia
-                db.session.commit()
-                logger.info(f"Updated match {match.id} to live and set last crawl time.")
+#             for match in matches_to_update:
+#                 match.isLive = True
+#                 match.last_crawl_time = current_time_mongolia
+#                 db.session.commit()
+#                 logger.info(f"Updated match {match.id} to live and set last crawl time.")
                 
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error occurred while updating live status: {str(e)}")
+#         except Exception as e:
+#             db.session.rollback()
+#             logger.error(f"Error occurred while updating live status: {str(e)}")
 
 def main(db: SQLAlchemy, app: Flask):
-    update_live_status(db)
-
-    print("Updated live matches", file=sys.stderr)
 
     current_time_mongolia = datetime.now(mongolia_tz)
-    thirty_minutes_ago = current_time_mongolia - timedelta(minutes=60)
-    ninety_minutes_ago = current_time_mongolia - timedelta(minutes=90)
 
     chrome_driver_path = chromedriver_autoinstaller.install()
     chrome_options = Options()
@@ -117,50 +129,46 @@ def main(db: SQLAlchemy, app: Flask):
             driver = webdriver.Chrome(service=service, options=chrome_options)
             live_matches_to_update = db.session.query(Matches).filter(
                 Matches.isLive == True,
-                Matches.last_crawl_time >= thirty_minutes_ago
             ).all()
             print("Live matches to update", live_matches_to_update, file=sys.stderr)
             for match in live_matches_to_update:
                 stream_links = get_live_links(driver, match.link)
+                current_time_mongolia = datetime.now(mongolia_tz)
+                current_time_mongolia = current_time_mongolia.replace(microsecond=0).replace(tzinfo=None)
                 if stream_links:
-                    stream_sources = get_stream_sources(driver, stream_links)
-                    print(f"Match {match.id} stream sources: {stream_sources}", file=sys.stderr)
-                    if stream_sources:
-                        for source in stream_sources:
-                            existing_source = db.session.query(StreamSources).filter_by(match_id=match.id, link=source).first()
-                            if not existing_source:
-                                stream_source = StreamSources(match_id=match.id, link=source)
-                                db.session.add(stream_source)
-                    else:
-                        existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
-                        if existing_sources:
-                            for source in existing_sources:
-                                db.session.delete(source)
-                                print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
-                            logger.info(f"Removed existing stream sources for match {match.id} due to no live sources found.")
+                    print("FOUND stream links", stream_links, match.team1name)
+                    # stream_sources = get_stream_sources(driver, stream_links)
+                    # print(f"Match {match.id} stream sources: {stream_sources}", file=sys.stderr)
+                    # if stream_sources:
+                    #     for source in stream_sources:
+                    #         existing_source = db.session.query(StreamSources).filter_by(match_id=match.id, link=source).first()
+                    #         if not existing_source:
+                    #             stream_source = StreamSources(match_id=match.id, link=source)
+                    #             db.session.add(stream_source)
+                elif not stream_links and match.datetime <= current_time_mongolia - timedelta(minutes=100):
+                    # No stream links found and match is over 100 minutes old, so delete
+                    existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
+                    for source in existing_sources:
+                        db.session.delete(source)
+                        print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
+                    db.session.delete(match)
+                    print(f"Deleted match {match.id} {match.team1name} due to no stream links and being older than 100 minutes.", file=sys.stderr)
+                if stream_links: 
+                    existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
+                    for source in existing_sources:
+                        db.session.delete(source)
+                        print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
 
-            # Remove stream sources for matches with no live sources found for 90 minutes
-            live_matches_to_remove_sources = db.session.query(Matches).filter(
-                Matches.isLive == True,
-                Matches.last_crawl_time < ninety_minutes_ago
-            ).all()
-            print("Live matches to remove sources", live_matches_to_remove_sources, file=sys.stderr)
-            for match in live_matches_to_remove_sources:
-                stream_links = get_live_links(driver, match.link)
-                if stream_links:
-                    stream_sources = get_stream_sources(driver, stream_links)
-                    print(f"Match {match.id} stream sources: {stream_sources}", file=sys.stderr)
-                    if not stream_sources:
-                        stream_sources_to_delete = db.session.query(StreamSources).filter_by(match_id=match.id).all()
-                        print(f"Stream sources to delete for match {match.id}: {stream_sources_to_delete}", file=sys.stderr)
-                        if stream_sources_to_delete:
-                            for source in stream_sources_to_delete:
-                                db.session.delete(source)
-                                print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
-                            logger.info(f"Removed stream sources for match {match.id} due to no live sources found for 90 minutes.")
-                        else:
-                            print(f"No stream sources found for match {match.id} to delete", file=sys.stderr)
+                    db.session.delete(match)
+                    print(f"Deleted match {match.id} {match.team1name} due to having only one stream link and being less than 2 hours old.", file=sys.stderr)
+                if stream_links and len(stream_links) <= 1 and match.datetime > current_time_mongolia - timedelta(minutes=100):
+                    existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
+                    for source in existing_sources:
+                        db.session.delete(source)
+                        print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
 
+                    db.session.delete(match)
+                    print(f"Deleted match {match.id} {match.team1name} due to having only one stream link and being less than 2 hours old.", file=sys.stderr)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -174,6 +182,6 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     global db, app
     app = appArg
     db = dbArg
-    print(f"Running stream source crawler at {datetime.now(mongolia_tz)}", file=sys.stderr)
-    scheduler.add_job(main, 'interval', minutes=10, args=[db, app])
+    # main(db, app)
+    # scheduler.add_job(main, 'interval', minutes=5, args=[db, app])
     scheduler.start()

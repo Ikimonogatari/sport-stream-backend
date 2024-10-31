@@ -13,8 +13,6 @@ db.init_app(app)
 
 CORS(app, supports_credentials=True)
 
-# logging.basicConfig(level=logging.DEBUG)
-
 @app.route('/matches', methods=['POST'])
 def create_match():
     try:
