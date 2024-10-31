@@ -46,12 +46,12 @@ class Matches(db.Model):
     isLive = db.Column(db.Boolean, nullable=False, default=False)
     description = db.Column(db.String, nullable=True) 
     last_crawl_time = db.Column(db.DateTime, nullable=True, default=None) 
-    
+    isCrawling = db.Column(db.Boolean, nullable=False, default=False)
     
     league = db.relationship("Leagues", back_populates="matches")
     stream_sources = db.relationship("StreamSources", back_populates="match", cascade="all, delete-orphan")
 
-    def __init__(self, team1name, team2name, link, time, date, league_id, datetime, isLive=False, description=None, last_crawl_time=None):
+    def __init__(self, team1name, team2name, link, time, date, league_id, datetime, isLive=False, description=None, last_crawl_time=None, isCrawling=False):
         self.team1name = team1name
         self.team2name = team2name
         self.link = link
@@ -65,6 +65,7 @@ class Matches(db.Model):
         self.isLive = isLive
         self.description = description
         self.last_crawl_time = last_crawl_time
+        self.isCrawling = isCrawling
 
 
     def json(self):
@@ -79,7 +80,8 @@ class Matches(db.Model):
             'datetime': self.datetime,
             'isLive': self.isLive,
             'description': self.description,
-            'last_crawl_time': self.last_crawl_time
+            'last_crawl_time': self.last_crawl_time,
+            'isCrawling': self.isCrawling
         }
 
     def __repr__(self):

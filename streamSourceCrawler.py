@@ -19,10 +19,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-executors = {
-    'default': ThreadPoolExecutor(1)
-}
-scheduler = BackgroundScheduler(executors=executors)
+scheduler = BackgroundScheduler()
 
 mongolia_tz = pytz.timezone('Asia/Ulaanbaatar')
 
@@ -113,14 +110,7 @@ def main(db: SQLAlchemy, app: Flask):
                 current_time_mongolia = current_time_mongolia.replace(microsecond=0).replace(tzinfo=None)
                 if stream_links:
                     print("FOUND stream links", stream_links, match.team1name)
-                    stream_sources = get_stream_sources(driver, stream_links)
-                    print(f"Match {match.id} stream sources: {stream_sources}", file=sys.stderr)
-                    if stream_sources:
-                        for source in stream_sources:
-                            existing_source = db.session.query(StreamSources).filter_by(match_id=match.id, link=source).first()
-                            if not existing_source:
-                                stream_source = StreamSources(match_id=match.id, link=source)
-                                db.session.add(stream_source)
+                   
                 elif not stream_links and match.datetime <= current_time_mongolia - timedelta(minutes=100):
                     # No stream links found and match is over 100 minutes old, so delete
                     existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
@@ -145,14 +135,23 @@ def main(db: SQLAlchemy, app: Flask):
 
                     db.session.delete(match)
                     print(f"Deleted match {match.id} {match.team1name} due to having only one stream link and being less than 2 hours old.", file=sys.stderr)
+                if match.datetime > current_time_mongolia - timedelta(minutes=200):
+                    existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
+                    for source in existing_sources:
+                        db.session.delete(source)
+                        print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
+
+                    db.session.delete(match)
+                    print(f"Deleted match {match.id} {match.team1name} due to having only one stream link and being less than 2 hours old.", file=sys.stderr)
+                
             db.session.commit()
         except Exception as e:
             db.session.rollback()
             logger.error(f"Error occurred during the main function: {str(e)}")
         finally:
             if driver:
-                driver.quit()  # Ensure the browser is properly closed after the job
-            db.session.close()  # Ensure session is properly removed after the job
+                driver.quit()  
+            db.session.close()  
 
 def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     global db, app

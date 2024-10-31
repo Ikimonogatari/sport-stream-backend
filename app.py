@@ -5,7 +5,14 @@ import logging
 from models import Matches, Leagues, StreamSources
 from database import db
 from datetime import datetime
-
+from streamSourceCrawler import get_live_links, get_stream_sources
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+import chromedriver_autoinstaller
 app = Flask(__name__)
 # app.logger.setLevel(logging.INFO)
 app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('DB_URL')
@@ -131,13 +138,54 @@ def get_matches_by_league():
 
 @app.route('/matches/<int:match_id>/stream_sources', methods=['GET'])
 def get_stream_sources_for_match(match_id):
+    print("CRAWLING HERE FOR REAL NIGGA")
+    chrome_driver_path = chromedriver_autoinstaller.install()
+    chrome_options = Options()
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--proxy-bypass-list=*")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-browser-side-navigation")
+    service = Service(executable_path=chrome_driver_path)
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+
     try:
+        stream_sources = [] 
         match = Matches.query.get(match_id)
         if not match:
             return make_response(jsonify({'message': 'Match not found'}), 404)
 
-        stream_sources = StreamSources.query.filter_by(match_id=match_id).all()
-        return make_response(jsonify([stream_source.json() for stream_source in stream_sources]), 200)
+        last_crawl_time = match.last_crawl_time or datetime.min
+
+        if match.isCrawling or (datetime.now() - last_crawl_time).total_seconds() < 300:
+            stream_sources = StreamSources.query.filter_by(match_id=match_id).all()
+            return make_response(jsonify([source.json() for source in stream_sources]), 200)
+
+        # Set isCrawling to True and update the last_crawl_time
+        match.isCrawling = True
+        match.last_crawl_time = datetime.now()
+        db.session.commit()
+
+        # Start the crawler
+        stream_links = get_live_links(driver, match.link)
+        if stream_links:
+            stream_sources = get_stream_sources(driver, stream_links)
+            # Save sources to database
+            for source in stream_sources:
+                if not StreamSources.query.filter_by(match_id=match_id, link=source).first():
+                    db.session.add(StreamSources(match_id=match_id, link=source))
+            db.session.commit()
+
+        match.isCrawling = False
+        db.session.commit()
+
+        # Return the fetched sources
+        return make_response(jsonify(stream_sources), 200)
+        # return make_response(jsonify([source.json() for source in stream_sources]), 200)
+        
+        # stream_sources = StreamSources.query.filter_by(match_id=match_id).all()
+        # return make_response(jsonify([stream_source.json() for stream_source in stream_sources]), 200)
     except Exception as e:
         app.logger.error(f"Error getting stream sources for match: {str(e)}")
         return make_response(jsonify({'message': 'Error getting stream sources', 'error': str(e)}), 500)
