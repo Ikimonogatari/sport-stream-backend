@@ -228,5 +228,5 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     db = dbArg
     # main(db, app)
     update_live_status(db, app)
-    # scheduler.add_job(main, 'interval', hours=24, args=[db, app])
+    scheduler.add_job(main, 'interval', hours=24, args=[db, app])
     scheduler.start()

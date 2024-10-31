@@ -159,5 +159,5 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     app = appArg
     db = dbArg
     # main(db, app)
-    # scheduler.add_job(main, 'interval', minutes=5, args=[db, app])
+    scheduler.add_job(main, 'interval', minutes=5, args=[db, app])
     scheduler.start()
