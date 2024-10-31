@@ -119,14 +119,6 @@ def main(db: SQLAlchemy, app: Flask):
                         print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
                     db.session.delete(match)
                     print(f"Deleted match {match.id} {match.team1name} due to no stream links and being older than 100 minutes.", file=sys.stderr)
-                if stream_links: 
-                    existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
-                    for source in existing_sources:
-                        db.session.delete(source)
-                        print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
-
-                    db.session.delete(match)
-                    print(f"Deleted match {match.id} {match.team1name} due to having only one stream link and being less than 2 hours old.", file=sys.stderr)
                 if stream_links and len(stream_links) <= 1 and match.datetime > current_time_mongolia - timedelta(minutes=100):
                     existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
                     for source in existing_sources:

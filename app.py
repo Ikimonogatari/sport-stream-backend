@@ -139,7 +139,7 @@ def get_matches_by_league():
 @app.route('/matches/<int:match_id>/stream_sources', methods=['GET'])
 def get_stream_sources_for_match(match_id):
     print("CRAWLING HERE FOR REAL NIGGA")
-    chrome_driver_path = chromedriver_autoinstaller.install()
+    # chrome_driver_path = chromedriver_autoinstaller.install()
     chrome_options = Options()
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--no-sandbox")
@@ -147,8 +147,8 @@ def get_stream_sources_for_match(match_id):
     chrome_options.add_argument("--proxy-bypass-list=*")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-browser-side-navigation")
-    service = Service(executable_path=chrome_driver_path)
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    # service = Service(executable_path=chrome_driver_path)
+    driver = webdriver.Chrome(options=chrome_options)
 
     try:
         stream_sources = [] 
@@ -159,6 +159,7 @@ def get_stream_sources_for_match(match_id):
         last_crawl_time = match.last_crawl_time or datetime.min
 
         if match.isCrawling or (datetime.now() - last_crawl_time).total_seconds() < 300:
+            print("CRAWLING NEW SOURCES")
             stream_sources = StreamSources.query.filter_by(match_id=match_id).all()
             return make_response(jsonify([source.json() for source in stream_sources]), 200)
 
@@ -170,6 +171,7 @@ def get_stream_sources_for_match(match_id):
         # Start the crawler
         stream_links = get_live_links(driver, match.link)
         if stream_links:
+
             stream_sources = get_stream_sources(driver, stream_links)
             # Save sources to database
             for source in stream_sources:
