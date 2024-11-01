@@ -83,8 +83,6 @@ def get_stream_sources(driver, links):
 
 def main(db: SQLAlchemy, app: Flask):
 
-    current_time_mongolia = datetime.now(mongolia_tz)
-
     chrome_driver_path = chromedriver_autoinstaller.install()
     chrome_options = Options()
     chrome_options.add_argument("--disable-dev-shm-usage")
@@ -105,38 +103,33 @@ def main(db: SQLAlchemy, app: Flask):
             ).all()
             print("Live matches to update", live_matches_to_update, file=sys.stderr)
             for match in live_matches_to_update:
-                stream_links = get_live_links(driver, match.link)
-                current_time_mongolia = datetime.now(mongolia_tz)
-                current_time_mongolia = current_time_mongolia.replace(microsecond=0).replace(tzinfo=None)
-                if stream_links:
-                    print("FOUND stream links", stream_links, match.team1name)
-                   
-                elif not stream_links and match.datetime <= current_time_mongolia - timedelta(minutes=100):
-                    # No stream links found and match is over 100 minutes old, so delete
-                    existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
-                    for source in existing_sources:
-                        db.session.delete(source)
+                try:
+                    current_time_mongolia = datetime.now(mongolia_tz).replace(microsecond=0, tzinfo=None)
+                    match_age = current_time_mongolia - match.datetime
+                    
+                    if match_age > timedelta(hours=4):
+                        db.session.query(StreamSources).filter_by(match_id=match.id).delete()  # Bulk delete
                         print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
-                    db.session.delete(match)
-                    print(f"Deleted match {match.id} {match.team1name} due to no stream links and being older than 100 minutes.", file=sys.stderr)
-                if stream_links and len(stream_links) <= 1 and match.datetime > current_time_mongolia - timedelta(minutes=100):
-                    existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
-                    for source in existing_sources:
-                        db.session.delete(source)
-                        print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
+                        db.session.delete(match)
+                        print(f"Deleted match {match.id} {match.team1name} due to being older than 2 hours and having no stream links.", file=sys.stderr)
 
-                    db.session.delete(match)
-                    print(f"Deleted match {match.id} {match.team1name} due to having only one stream link and being less than 2 hours old.", file=sys.stderr)
-                if match.datetime > current_time_mongolia - timedelta(minutes=200):
-                    existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
-                    for source in existing_sources:
-                        db.session.delete(source)
-                        print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
+                    elif timedelta(minutes=40) < match_age < timedelta(hours=2):
+                        stream_links = get_live_links(driver, match.link)
 
-                    db.session.delete(match)
-                    print(f"Deleted match {match.id} {match.team1name} due to having only one stream link and being less than 2 hours old.", file=sys.stderr)
-                
-            db.session.commit()
+                        if stream_links is None or len(stream_links) <= 1:
+                            existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
+                            for source in existing_sources:
+                                db.session.delete(source)
+                                print(f"Deleted stream source: {source.link} for match {match.team1name}", file=sys.stderr)
+                            db.session.delete(match)
+                            print(f"Deleted match {match.id} {match.team1name}", file=sys.stderr)
+
+                except Exception as e:
+                    db.session.rollback()  # Rollback only for current iteration if needed
+                    logger.error(f"Error processing match {match.id} ({match.team1name}): {str(e)}")
+                else:
+                    db.session.commit()
+                    
         except Exception as e:
             db.session.rollback()
             logger.error(f"Error occurred during the main function: {str(e)}")
@@ -149,6 +142,6 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     global db, app
     app = appArg
     db = dbArg
-    # main(db, app)
+    main(db, app)
     scheduler.add_job(main, 'interval', minutes=5, args=[db, app])
     scheduler.start()

@@ -114,6 +114,7 @@ def update_live_status(db: SQLAlchemy, app: Flask):
         
         for match in matches_to_update:
             match.isLive = True
+            match.last_crawl_time = datetime.now()
         
         db.session.commit()
 
@@ -216,6 +217,7 @@ def main(db: SQLAlchemy, app: Flask):
             for league in leagues:
                 driver = setup_driver()
                 scheduleCrawler(driver, league)
+                update_live_status(db, app)
                 logger.info(f"{league.name} matches added")
         except Exception as e:
             logger.error(f"Failed to connect to database or run crawler: {str(e)}")
@@ -228,5 +230,5 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     db = dbArg
     # main(db, app)
     update_live_status(db, app)
-    scheduler.add_job(main, 'interval', hours=24, args=[db, app])
+    scheduler.add_job(main, 'interval', hours=8, args=[db, app])
     scheduler.start()
