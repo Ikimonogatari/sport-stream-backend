@@ -11,7 +11,6 @@ import pytz
 import chromedriver_autoinstaller
 import sys
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.executors.pool import ThreadPoolExecutor
 
 from flask import Flask
 import logging
@@ -129,7 +128,7 @@ def main(db: SQLAlchemy, app: Flask):
                     logger.error(f"Error processing match {match.id} ({match.team1name}): {str(e)}")
                 else:
                     db.session.commit()
-                    
+
         except Exception as e:
             db.session.rollback()
             logger.error(f"Error occurred during the main function: {str(e)}")

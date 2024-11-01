@@ -12,7 +12,6 @@ from datetime import datetime, timedelta
 import sys
 import chromedriver_autoinstaller
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.date import DateTrigger
 from apscheduler.executors.pool import ThreadPoolExecutor
 import logging
 

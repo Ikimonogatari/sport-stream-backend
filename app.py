@@ -7,14 +7,8 @@ from database import db
 from datetime import datetime
 from streamSourceCrawler import get_live_links, get_stream_sources
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-import chromedriver_autoinstaller
 app = Flask(__name__)
-# app.logger.setLevel(logging.INFO)
 app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('DB_URL')
 db.init_app(app)
 
@@ -184,10 +178,7 @@ def get_stream_sources_for_match(match_id):
 
         # Return the fetched sources
         return make_response(jsonify(stream_sources), 200)
-        # return make_response(jsonify([source.json() for source in stream_sources]), 200)
         
-        # stream_sources = StreamSources.query.filter_by(match_id=match_id).all()
-        # return make_response(jsonify([stream_source.json() for stream_source in stream_sources]), 200)
     except Exception as e:
         app.logger.error(f"Error getting stream sources for match: {str(e)}")
         return make_response(jsonify({'message': 'Error getting stream sources', 'error': str(e)}), 500)
