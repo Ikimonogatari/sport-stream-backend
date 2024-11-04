@@ -106,16 +106,16 @@ def main(db: SQLAlchemy, app: Flask):
                     current_time_mongolia = datetime.now(mongolia_tz).replace(microsecond=0, tzinfo=None)
                     match_age = current_time_mongolia - match.datetime
                     
-                    if match_age > timedelta(hours=4):
+                    if match_age > timedelta(hours=3):
                         db.session.query(StreamSources).filter_by(match_id=match.id).delete()  # Bulk delete
-                        print(f"Deleted stream source: {source.link} for match {match.id}", file=sys.stderr)
+                        print(f"Deleted stream source for match {match.id}", file=sys.stderr)
                         db.session.delete(match)
                         print(f"Deleted match {match.id} {match.team1name} due to being older than 2 hours and having no stream links.", file=sys.stderr)
 
                     elif timedelta(minutes=40) < match_age < timedelta(hours=2):
                         stream_links = get_live_links(driver, match.link)
 
-                        if stream_links is None or len(stream_links) <= 1:
+                        if stream_links is None:
                             existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
                             for source in existing_sources:
                                 db.session.delete(source)
@@ -123,6 +123,16 @@ def main(db: SQLAlchemy, app: Flask):
                             db.session.delete(match)
                             print(f"Deleted match {match.id} {match.team1name}", file=sys.stderr)
 
+                    elif match_age > timedelta(hours=2):
+                        stream_links = get_live_links(driver, match.link)
+                        
+                        if stream_links is not None and len(stream_links) <= 1:
+                            existing_sources = db.session.query(StreamSources).filter_by(match_id=match.id).all()
+                            for source in existing_sources:
+                                db.session.delete(source)
+                                print(f"Deleted stream source: {source.link} for match {match.team1name}", file=sys.stderr)
+                            db.session.delete(match)
+                            print(f"Deleted match {match.id} {match.team1name}", file=sys.stderr)
                 except Exception as e:
                     db.session.rollback()  # Rollback only for current iteration if needed
                     logger.error(f"Error processing match {match.id} ({match.team1name}): {str(e)}")
