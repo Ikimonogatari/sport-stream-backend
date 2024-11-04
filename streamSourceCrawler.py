@@ -105,7 +105,7 @@ def main(db: SQLAlchemy, app: Flask):
                 try:
                     current_time_mongolia = datetime.now(mongolia_tz).replace(microsecond=0, tzinfo=None)
                     match_age = current_time_mongolia - match.datetime
-                    
+
                     if match_age > timedelta(hours=3):
                         db.session.query(StreamSources).filter_by(match_id=match.id).delete()  # Bulk delete
                         print(f"Deleted stream source for match {match.id}", file=sys.stderr)

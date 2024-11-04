@@ -153,17 +153,17 @@ def get_stream_sources_for_match(match_id):
         last_crawl_time = match.last_crawl_time or datetime.min
 
         if match.isCrawling or (datetime.now() - last_crawl_time).total_seconds() < 300:
-            print("CRAWLING NEW SOURCES")
+            app.logger.info("SHOWING OLD CRAWLS")
             stream_sources = StreamSources.query.filter_by(match_id=match_id).all()
             return make_response(jsonify([source.json() for source in stream_sources]), 200)
 
         # Set isCrawling to True and update the last_crawl_time
+        app.logger.info("CRAWLING NEW SOURCES")
         match.isCrawling = True
-        match.last_crawl_time = datetime.now()
         db.session.commit()
 
         # Start the crawler
-        stream_links = get_live_links(driver, match.link)
+        stream_links = get_live_links(driver, match.link)   
         if stream_links:
 
             stream_sources = get_stream_sources(driver, stream_links)
@@ -171,8 +171,10 @@ def get_stream_sources_for_match(match_id):
             for source in stream_sources:
                 if not StreamSources.query.filter_by(match_id=match_id, link=source).first():
                     db.session.add(StreamSources(match_id=match_id, link=source))
+            match.last_crawl_time = datetime.now()
             db.session.commit()
 
+        
         match.isCrawling = False
         db.session.commit()
 

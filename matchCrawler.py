@@ -97,7 +97,7 @@ def schedule_next_live_update(db: SQLAlchemy, app: Flask):
             print(current_time_mongolia, "CURRENT MGL TIME")
             # Schedule a one-time job for when the match should go live
             scheduler.add_job(update_live_status, run_date=next_match_time, args=[db, app])
-            logger.info(f"set sched 6969 {upcoming_match.id} at {next_match_time}")
+            logger.info(f"set sched {upcoming_match.id} at {next_match_time}")
             print("Jobs:", scheduler.get_jobs())
         else:
             logger.info("No upcoming matches to schedule.")
