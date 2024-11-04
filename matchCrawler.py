@@ -56,10 +56,10 @@ def insert_default_leagues():
         {"name": "Curling", "url": "https://www.sportshub.stream/curling-streams/"},
         {"name": "Hockey", "url": "https://hockey3.sportshub.stream/"},
         {"name": "NBA", "url": "https://nba37.sportshub.stream/"},
-        # {"name": "NHL", "url": "https://nhl5.sportshub.stream/"},
-        # {"name": "NFL", "url": "https://nfl2.sportshub.stream/"},
-        # {"name": "MLB", "url": "https://mlb2.sportshub.stream/"},
-        # {"name": "MLS", "url": "https://mls2.sportshub.stream/"},
+        {"name": "NHL", "url": "https://nhl5.sportshub.stream/"},
+        {"name": "NFL", "url": "https://nfl2.sportshub.stream/"},
+        {"name": "MLB", "url": "https://mlb2.sportshub.stream/"},
+        {"name": "MLS", "url": "https://mls2.sportshub.stream/"},
     ]
 
     for league_info in default_leagues:
@@ -229,5 +229,5 @@ def main_loop(appArg: Flask, dbArg: SQLAlchemy):
     db = dbArg
     # main(db, app)
     update_live_status(db, app)
-    scheduler.add_job(main, 'interval', hours=8, args=[db, app])
+    scheduler.add_job(main, 'interval', hours=12, args=[db, app])
     scheduler.start()

@@ -23,15 +23,17 @@ class StreamSources(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     match_id = db.Column(db.Integer, db.ForeignKey('matches.id'))
     link = db.Column(db.String)
+    source = db.Column(db.String)
 
     match = db.relationship("Matches", back_populates="stream_sources")
     
-    def __init__(self, match_id, link):
+    def __init__(self, match_id, link, source):
         self.match_id = match_id
         self.link = link
+        self.source = source
 
     def json(self):
-        return {'id': self.id, 'match_id': self.match_id, 'link': self.link}
+        return {'id': self.id, 'match_id': self.match_id, 'link': self.link, 'source': self.source}
 
 class Matches(db.Model):
     __tablename__ = 'matches'
@@ -81,7 +83,8 @@ class Matches(db.Model):
             'isLive': self.isLive,
             'description': self.description,
             'last_crawl_time': self.last_crawl_time,
-            'isCrawling': self.isCrawling
+            'isCrawling': self.isCrawling,
+            
         }
 
     def __repr__(self):

@@ -132,55 +132,57 @@ def get_matches_by_league():
 
 @app.route('/matches/<int:match_id>/stream_sources', methods=['GET'])
 def get_stream_sources_for_match(match_id):
-    print("CRAWLING HERE FOR REAL NIGGA")
-    # chrome_driver_path = chromedriver_autoinstaller.install()
     chrome_options = Options()
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--proxy-bypass-list=*")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-browser-side-navigation")
-    # service = Service(executable_path=chrome_driver_path)
     driver = webdriver.Chrome(options=chrome_options)
 
     try:
-        stream_sources = [] 
         match = Matches.query.get(match_id)
         if not match:
             return make_response(jsonify({'message': 'Match not found'}), 404)
 
         last_crawl_time = match.last_crawl_time or datetime.min
 
-        if match.isCrawling or (datetime.now() - last_crawl_time).total_seconds() < 300:
-            app.logger.info("SHOWING OLD CRAWLS")
-            stream_sources = StreamSources.query.filter_by(match_id=match_id).all()
-            return make_response(jsonify([source.json() for source in stream_sources]), 200)
+        # If the match is already being crawled or was recently crawled, return existing sources
+        if  match.isCrawling or (datetime.now() - last_crawl_time).total_seconds() < 300:
+            app.logger.info(match.last_crawl_time, "THE CRAWL TIME DURATION")
+            app.logger.info("Returning existing stream sources due to recent crawl")
+            existing_sources = StreamSources.query.filter_by(match_id=match_id).all()
+            return make_response(jsonify([source.json() for source in existing_sources]), 200)
 
-        # Set isCrawling to True and update the last_crawl_time
-        app.logger.info("CRAWLING NEW SOURCES")
+        # Set isCrawling to True to indicate a new crawl is in progress
         match.isCrawling = True
         db.session.commit()
+        # Start the crawler to get live links
+        stream_links = get_live_links(driver, match.link)
+        new_sources = []
 
-        # Start the crawler
-        stream_links = get_live_links(driver, match.link)   
         if stream_links:
+            for link in stream_links:
+                # Check if the link already exists in the database
+                existing_source = StreamSources.query.filter_by(match_id=match_id, link=link).first()
+                if not existing_source:
+                    app.logger.info("ADDED NEW SOURCE")
+                    # Crawl and add new sources only if the link is new
+                    new_source_links = get_stream_sources(driver, [link])
+                    for source in new_source_links:
+                        new_source = StreamSources(match_id=match_id, link=link, source=source)
+                        db.session.add(new_source)
+                        new_sources.append(new_source)
 
-            stream_sources = get_stream_sources(driver, stream_links)
-            # Save sources to database
-            for source in stream_sources:
-                if not StreamSources.query.filter_by(match_id=match_id, link=source).first():
-                    db.session.add(StreamSources(match_id=match_id, link=source))
+            # Update last crawl time and reset isCrawling status
             match.last_crawl_time = datetime.now()
             db.session.commit()
 
-        
         match.isCrawling = False
         db.session.commit()
+        # Get all sources (both new and existing) and return them
+        all_sources = StreamSources.query.filter_by(match_id=match_id).all()
+        return make_response(jsonify([source.json() for source in all_sources]), 200)
 
-        # Return the fetched sources
-        return make_response(jsonify(stream_sources), 200)
-        
     except Exception as e:
         app.logger.error(f"Error getting stream sources for match: {str(e)}")
         return make_response(jsonify({'message': 'Error getting stream sources', 'error': str(e)}), 500)
