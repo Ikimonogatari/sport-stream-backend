@@ -11,6 +11,10 @@ import pytz
 import chromedriver_autoinstaller
 import sys
 from apscheduler.schedulers.background import BackgroundScheduler
+import random
+import requests
+SCRAPER_API_KEY = '6be10ab64669a2f166584ccf985109c6'
+scraper_api_url = "http://api.scraperapi.com"   
 
 from flask import Flask
 import logging
@@ -90,7 +94,10 @@ def main(db: SQLAlchemy, app: Flask):
     chrome_options.add_argument("--proxy-bypass-list=*")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-browser-side-navigation")
-
+    target_url = 'https://sportshub.stream'
+    proxy = f"{scraper_api_url}?api_key={SCRAPER_API_KEY}&url={target_url}"
+    chrome_options.add_argument(f'--proxy-server={proxy}')
+    
     service = Service(executable_path=chrome_driver_path)
 
     with app.app_context():

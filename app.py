@@ -8,6 +8,9 @@ from datetime import datetime
 from streamSourceCrawler import get_live_links, get_stream_sources
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+SCRAPER_API_KEY = '6be10ab64669a2f166584ccf985109c6'
+scraper_api_url = "http://api.scraperapi.com"   
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('DB_URL')
 db.init_app(app)
@@ -137,6 +140,11 @@ def get_stream_sources_for_match(match_id):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--proxy-bypass-list=*")
+    chrome_options.add_argument("--disable-browser-side-navigation")
+    target_url = 'https://sportshub.stream'
+    proxy = f"{scraper_api_url}?api_key={SCRAPER_API_KEY}&url={target_url}"
+    chrome_options.add_argument(f'--proxy-server={proxy}')
+
     driver = webdriver.Chrome(options=chrome_options)
 
     try:
