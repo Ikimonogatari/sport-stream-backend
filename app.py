@@ -148,7 +148,7 @@ def get_stream_sources_for_match(match_id):
 
         # If the match is already being crawled or was recently crawled, return existing sources
         if  match.isCrawling or (datetime.now() - last_crawl_time).total_seconds() < 300:
-            app.logger.info(match.last_crawl_time, "THE CRAWL TIME DURATION")
+            
             app.logger.info("Returning existing stream sources due to recent crawl")
             existing_sources = StreamSources.query.filter_by(match_id=match_id).all()
             return make_response(jsonify([source.json() for source in existing_sources]), 200)
