@@ -55,11 +55,11 @@ def insert_default_leagues():
         {"name": "Winter Sports", "url": "https://www.sportshub.stream/winter-sports-streams/"},
         {"name": "Curling", "url": "https://www.sportshub.stream/curling-streams/"},
         {"name": "Hockey", "url": "https://hockey3.sportshub.stream/"},
-        {"name": "NBA", "url": "https://nba37.sportshub.stream/"},
-        {"name": "NHL", "url": "https://nhl5.sportshub.stream/"},
-        {"name": "NFL", "url": "https://nfl2.sportshub.stream/"},
-        {"name": "MLB", "url": "https://mlb2.sportshub.stream/"},
-        {"name": "MLS", "url": "https://mls2.sportshub.stream/"},
+        {"name": "NBA", "url": "https://nba46.sportshub.stream/"},
+        {"name": "NHL", "url": "https://nhl11.sportshub.stream/"},
+        {"name": "NFL", "url": "https://nfl8.sportshub.stream/"},
+        {"name": "MLB", "url": "https://mlb8.sportshub.stream/"},
+        {"name": "MLS", "url": "https://mls8.sportshub.stream/"},
     ]
 
     for league_info in default_leagues:

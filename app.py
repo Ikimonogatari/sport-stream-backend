@@ -152,6 +152,9 @@ def get_stream_sources_for_match(match_id):
         if not match:
             return make_response(jsonify({'message': 'Match not found'}), 404)
 
+        if not match.isLive:
+            return make_response(jsonify({'message': 'Match is not live'}), 200)
+        
         last_crawl_time = match.last_crawl_time or datetime.min
 
         # If the match is already being crawled or was recently crawled, return existing sources
