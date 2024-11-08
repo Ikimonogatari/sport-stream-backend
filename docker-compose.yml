@@ -11,6 +11,7 @@ services:
       - "4000:4000"
     environment:
       - DB_URL=postgresql://postgres:postgres@sportstream_db:5432/postgres
+    shm_size: "1g"
     depends_on:
       - sportstream_db
   sportstream_db:
