@@ -141,6 +141,9 @@ def get_stream_sources_for_match(match_id):
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--proxy-bypass-list=*")
     chrome_options.add_argument("--disable-browser-side-navigation")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--remote-debugging-port=9222")
+    
     target_url = 'https://sportshub.stream'
     proxy = f"{scraper_api_url}?api_key={SCRAPER_API_KEY}&url={target_url}"
     chrome_options.add_argument(f'--proxy-server={proxy}')
