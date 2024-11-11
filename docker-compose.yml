@@ -14,6 +14,10 @@ services:
     shm_size: "1g"
     depends_on:
       - sportstream_db
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
   sportstream_db:
     container_name: sportstream_db
     image: postgres:12
