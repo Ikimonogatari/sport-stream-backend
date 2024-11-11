@@ -144,24 +144,6 @@ def get_matches_by_league():
 
 @app.route('/matches/<int:match_id>/stream_sources', methods=['GET'])
 def get_stream_sources_for_match(match_id):
-<<<<<<< HEAD
-    chrome_options = Options()
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--proxy-bypass-list=*")
-    chrome_options.add_argument("--disable-browser-side-navigation")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--remote-debugging-port=9222")
-    
-    target_url = 'https://sportshub.stream'
-    proxy = f"{scraper_api_url}?api_key={SCRAPER_API_KEY}&url={target_url}"
-    chrome_options.add_argument(f'--proxy-server={proxy}')
-
-    driver = webdriver.Chrome(options=chrome_options)
-
-=======
->>>>>>> staging
     try:
         match = Matches.query.get(match_id)
         if not match:
@@ -190,6 +172,11 @@ def get_stream_sources_for_match(match_id):
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--proxy-bypass-list=*")
         chrome_options.add_argument("--disable-browser-side-navigation")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--remote-debugging-port=9222")
+        chrome_options.add_argument('--no-zygote')
+        chrome_options.add_argument("--disable-gpu") 
+        
         target_url = 'https://sportshub.stream'
         proxy = f"{scraper_api_url}?api_key={SCRAPER_API_KEY}&url={target_url}"
         chrome_options.add_argument(f'--proxy-server={proxy}')
