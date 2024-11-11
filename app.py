@@ -127,14 +127,24 @@ def get_matches_by_league():
             app.logger.warning(f"League not found: {league_name}")
             return make_response(jsonify({'message': 'League not found'}), 404)
 
-        matches = Matches.query.filter_by(league_id=league.id).all()
+        # Get the current time and subtract 3 hours
+        three_hours_ago = datetime.now() - timedelta(hours=3)
+
+        # Query for matches in this league with datetime no older than 3 hours ago
+        matches = Matches.query.filter(
+            Matches.league_id == league.id,
+            Matches.datetime >= three_hours_ago
+        ).all()
+        
         return make_response(jsonify([match.json() for match in matches]), 200)
     except Exception as e:
         app.logger.error(f"Error getting matches: {str(e)}")
         return make_response(jsonify({'message': 'Error getting matches', 'error': str(e)}), 500)
 
+
 @app.route('/matches/<int:match_id>/stream_sources', methods=['GET'])
 def get_stream_sources_for_match(match_id):
+<<<<<<< HEAD
     chrome_options = Options()
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--no-sandbox")
@@ -150,6 +160,8 @@ def get_stream_sources_for_match(match_id):
 
     driver = webdriver.Chrome(options=chrome_options)
 
+=======
+>>>>>>> staging
     try:
         match = Matches.query.get(match_id)
         if not match:
@@ -166,11 +178,22 @@ def get_stream_sources_for_match(match_id):
             app.logger.info("Returning existing stream sources due to recent crawl")
             existing_sources = StreamSources.query.filter_by(match_id=match_id).all()
             return make_response(jsonify([source.json() for source in existing_sources]), 200)
+        
 
         # Set isCrawling to True to indicate a new crawl is in progress
         match.isCrawling = True
         db.session.commit()
         # Start the crawler to get live links
+        chrome_options = Options()
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--proxy-bypass-list=*")
+        chrome_options.add_argument("--disable-browser-side-navigation")
+        target_url = 'https://sportshub.stream'
+        proxy = f"{scraper_api_url}?api_key={SCRAPER_API_KEY}&url={target_url}"
+        chrome_options.add_argument(f'--proxy-server={proxy}')
+        driver = webdriver.Chrome(options=chrome_options)
         stream_links = get_live_links(driver, match.link)
         new_sources = []
 
