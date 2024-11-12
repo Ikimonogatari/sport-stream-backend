@@ -4,7 +4,8 @@ from os import environ
 import logging
 from models import Matches, Leagues, StreamSources
 from database import db
-from datetime import datetime
+from datetime import datetime, timedelta
+import pytz
 from streamSourceCrawler import get_live_links, get_stream_sources
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -14,6 +15,7 @@ scraper_api_url = "http://api.scraperapi.com"
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('DB_URL')
 db.init_app(app)
+mongolia_tz = pytz.timezone('Asia/Ulaanbaatar')
 
 CORS(app, supports_credentials=True)
 
@@ -126,9 +128,9 @@ def get_matches_by_league():
         if not league:
             app.logger.warning(f"League not found: {league_name}")
             return make_response(jsonify({'message': 'League not found'}), 404)
-
+        current_time_mongolia = datetime.now(mongolia_tz).replace(microsecond=0, tzinfo=None)
         # Get the current time and subtract 3 hours
-        three_hours_ago = datetime.now() - timedelta(hours=3)
+        three_hours_ago = current_time_mongolia - timedelta(hours=3)
 
         # Query for matches in this league with datetime no older than 3 hours ago
         matches = Matches.query.filter(
