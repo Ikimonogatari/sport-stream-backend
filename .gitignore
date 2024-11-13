@@ -1,1 +1,42 @@
+# Byte-compiled files
 __pycache__/
+*.py[cod]
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+*.eggs/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+.virtualenv/
+
+# IDE / Editor directories and files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.iml
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Pytest cache
+.pytest_cache/
+
+# Pylint and other linters' outputs
+pylint-report.txt
+pylint-errors.txt
+
+# C
+
+# custom
+data/
