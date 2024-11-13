@@ -172,4 +172,4 @@ def get_stream_sources_for_match(match_id):
 
 
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(debug=False, port=5000)
