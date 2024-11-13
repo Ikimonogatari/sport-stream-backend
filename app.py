@@ -38,7 +38,8 @@ def create_match():
 def get_matches():
     try:
         now = datetime.now()
-        future_matches = Matches.query.filter(Matches.datetime > now).all()
+        future_matches = Matches.query.filter(
+            Matches.datetime > now).order_by(Matches.datetime.asc()).all()
         return make_response(jsonify([match.json() for match in future_matches]), 200)
     except Exception as e:
         return make_response(jsonify({'message': 'Error getting matches', 'error': str(e)}), 500)
@@ -68,7 +69,7 @@ def get_live_matches():
         live_matches = Matches.query.filter(
             Matches.datetime <= datetime.now(),
             Matches.expected_end_at >= datetime.now()
-        ).all()
+        ).order_by(Matches.datetime.asc()).all()
         return make_response(jsonify([match.json() for match in live_matches]), 200)
     except Exception as e:
         return make_response(jsonify({'message': 'Error getting live matches', 'error': str(e)}), 500)
@@ -147,7 +148,7 @@ def get_matches_by_league():
         matches = Matches.query.filter(
             Matches.league_id == league.id,
             Matches.datetime >= three_hours_ago
-        ).all()
+        ).order_by(Matches.datetime.asc()).all()
 
         return make_response(jsonify([match.json() for match in matches]), 200)
     except Exception as e:
