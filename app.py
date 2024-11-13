@@ -9,7 +9,7 @@ import pytz
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = environ.get('DB_URL') if environ.get(
-    'DB_URL') else 'postgresql://postgres:postgres@localhost:5436/postgres'
+    'DB_URL') else 'postgresql://sportstream:cXK99Y82erOm4608@localhost:5436/sportstream'
 db.init_app(app)
 
 mongolia_tz = pytz.timezone('Asia/Ulaanbaatar')
