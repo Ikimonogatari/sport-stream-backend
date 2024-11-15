@@ -87,7 +87,11 @@ class Matches(db.Model):
         """Returns True if the match is live, based on the current time."""
         current_time = datetime.now()
         # Check if the current time is within the match start and expected end times
-        return self.datetime <= current_time <= self.expected_end_at
+        scheduled_time = self.datetime <= current_time <= self.expected_end_at
+        if scheduled_time:
+            return scheduled_time
+        live_now = self.live_end_at < current_time
+        return live_now
 
     def json(self):
         return {
