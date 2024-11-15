@@ -90,6 +90,8 @@ class Matches(db.Model):
         scheduled_time = self.datetime <= current_time <= self.expected_end_at
         if scheduled_time:
             return scheduled_time
+        if not self.live_end_at:
+            return False
         live_now = self.live_end_at < current_time
         return live_now
 
