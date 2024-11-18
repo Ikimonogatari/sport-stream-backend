@@ -159,24 +159,25 @@ def get_matches_by_league():
 @app.route('/matches/<int:match_id>/stream_sources', methods=['GET'])
 def get_stream_sources_for_match(match_id):
     try:
-        match = Matches.query.get(match_id)
-        if not match:
-            return make_response(jsonify({'message': 'Match not found'}), 404)
-        if not match.isLive:
-            return make_response(jsonify({'message': 'Match is not live'}), 200)
-        if match.isLive and not match.source_found_at:
-            if match.user_checked_at:
-                app.logger.info(
-                    f"match {match.id} user_checked_at {match.user_checked_at}")
-                return make_response(jsonify([]), 200)
-            with app.app_context():
+        with app.app_context():
+            match = Matches.query.get(match_id)
+            if not match:
+                return make_response(jsonify({'message': 'Match not found'}), 404)
+            if not match.isLive:
+                return make_response(jsonify({'message': 'Match is not live'}), 200)
+            if match.isLive and not match.source_found_at:
+                if match.user_checked_at:
+                    app.logger.info(
+                        f"match {match.id} user_checked_at {match.user_checked_at}")
+                    return make_response(jsonify([]), 200)
                 app.logger.info(
                     f"request match {match.id} user_checked_at {match.user_checked_at}")
                 match.user_checked_at = datetime.now()
                 db.session.commit()
                 return make_response(jsonify([]), 200)
-        all_sources = StreamSources.query.filter_by(match_id=match_id).all()
-        return make_response(jsonify([source.json() for source in all_sources]), 200)
+            all_sources = StreamSources.query.filter_by(
+                match_id=match_id).all()
+            return make_response(jsonify([source.json() for source in all_sources]), 200)
 
     except Exception as e:
         app.logger.error(f"Error getting stream sources for match: {str(e)}")
