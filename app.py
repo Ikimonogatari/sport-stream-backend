@@ -164,6 +164,13 @@ def get_stream_sources_for_match(match_id):
             return make_response(jsonify({'message': 'Match not found'}), 404)
         if not match.isLive:
             return make_response(jsonify({'message': 'Match is not live'}), 200)
+        if match.isLive and not match.source_found_at:
+            if match.user_checked_at:
+                return make_response(jsonify([]), 200)
+            with app.app_context():
+                match.user_checked_at = datetime.now()
+                db.session.commit()
+                return make_response(jsonify([]), 200)
         all_sources = StreamSources.query.filter_by(match_id=match_id).all()
         return make_response(jsonify([source.json() for source in all_sources]), 200)
 

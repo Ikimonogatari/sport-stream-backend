@@ -57,13 +57,18 @@ class Matches(db.Model):
     created_at = db.Column(db.DateTime, nullable=True)
     description = db.Column(db.String, nullable=True)
     last_crawl_time = db.Column(db.DateTime, nullable=True, default=None)
+    source_found_at = db.Column(db.DateTime, nullable=True, default=None)
     isCrawling = db.Column(db.Boolean, nullable=False, default=False)
+
+    # maybe later
+    user_checked_at = db.Column(db.DateTime, nullable=True)
+    # source_found_at = db.Column(db.DateTime, nullable=True)
 
     league = db.relationship("Leagues", back_populates="matches")
     stream_sources = db.relationship(
         "StreamSources", back_populates="match", cascade="all, delete-orphan")
 
-    def __init__(self, team1name, team2name, link, time, date, league_id, datetime, live_at=None, description=None, last_crawl_time=None, isCrawling=False, created_at=None, live_end_at=None, expected_end_at=None):
+    def __init__(self, team1name, team2name, link, time, date, league_id, datetime, live_at=None, description=None, last_crawl_time=None, isCrawling=False, created_at=None, live_end_at=None, expected_end_at=None, source_found_at=None, user_checked_at=None):
         self.team1name = team1name
         self.team2name = team2name
         self.link = link
@@ -81,13 +86,15 @@ class Matches(db.Model):
         self.description = description
         self.last_crawl_time = last_crawl_time
         self.isCrawling = isCrawling
+        self.source_found_at = source_found_at
+        self.user_checked_at = user_checked_at
 
     @property
     def isLive(self):
         """Returns True if the match is live, based on the current time."""
         current_time = datetime.now()
         # Check if the current time is within the match start and expected end times
-        scheduled_time = self.datetime <= current_time <= self.expected_end_at
+        scheduled_time = self.datetime <= current_time < self.expected_end_at
         if scheduled_time:
             return scheduled_time
         if not self.live_end_at:
@@ -112,6 +119,8 @@ class Matches(db.Model):
             'last_crawl_time': self.last_crawl_time,
             'isCrawling': self.isCrawling,
             'isLive': self.isLive,
+            'source_found_at': self.source_found_at,
+            'user_checked_at': self.user_checked_at,
         }
 
     def __repr__(self):
